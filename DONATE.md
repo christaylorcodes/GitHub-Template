@@ -1,5 +1,5 @@
-## [Donating](https://paypal.me/ChrisTaylorCodes)
-The fastest and easiest way to donate is to star and follow the project. The best way you can donate to a project is by [contributing](CONTRIBUTE.md). If you cant take time to contribute maybe you would like to help in other ways.
+## Donating
+The fastest and easiest way to donate is to star and follow the project. The best way you can donate to a project is by contributing. If you cant take time to contribute maybe you would like to help in other ways.
 
 It takes time to maintain this project. Does the time spent on this module help you do cool things? Is that time worth a beer or two?
 

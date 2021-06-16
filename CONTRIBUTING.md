@@ -1,4 +1,4 @@
-# Contributing to a Chris Taylor Codes project
+# Contributing to a 'Chris Taylor Codes' project
 :+1::tada: First off, thanks for taking the time to contribute! :tada::+1:
 
 The following is a set of guidelines for contributing. These are mostly guidelines, not rules. Use your best judgment, and feel free to propose changes to this document, or anything else in a pull request.
@@ -24,13 +24,16 @@ The following is a set of guidelines for contributing. These are mostly guidelin
 
 > **Note:** *Please don't file an issue to ask a question.* You'll get faster results by using the resources below.
 
-Join the MSPGeek Slack team:
+Join a community Slack team:
 
 -   [Join the MSPGeek Slack Team](https://join.mspgeek.com/)
+-   [Join the PowerShell Slack Team](https://powershell.slack.com/join/shared_invite/zt-eodd93as-RHYl6s~9XH8FNyE09M7zmA#/)
+-   [Join the Screeps Slack Team](https://chat.screeps.com/)
+
     -   Even though Slack is a chat service, sometimes it takes several hours for community members to respond — please be patient!
     -   Use a channel that looks appropriate for general questions or discussion
     -   There are many other channels available, check the channel list
-    -   @CTaylor, send me a DM if you want
+    -   Send me a DM if you want, @CTaylor
 
 ## How Can I Contribute
 
@@ -64,21 +67,11 @@ Provide more context by answering these questions:
 -   **Did the problem start happening recently** (e.g. after updating to a new version of Manage) or was this always a problem?
 -   **Can you reliably reproduce the issue?** If not, provide details about how often the problem happens and under which conditions it normally happens.
 
-Include details about your configuration and environment:
-
--   **Include the debug output from [New-CWMDebugReport](<>)!**
--   **What's the name and version of the OS you're using**?
-
 ### Suggesting Enhancements
 
 This section guides you through submitting an enhancement suggestion, including completely new features and minor improvements to existing functionality. Following these guidelines helps maintainers and the community understand your suggestion :pencil: and find related suggestions :mag_right:.
 
 Before creating enhancement suggestions, please check existing suggestions as you might find out that you don't need to create one. When you are creating an enhancement suggestion, please include as many details as possible. Fill in the template, including the steps that you imagine you would take if the feature you're requesting existed.
-
-#### Before Submitting An Enhancement Suggestion
-
--   **Check the [Wiki](<>)** for tips — you might discover that the enhancement is already available.
--   **Check if there's already [a package](<>) which provides that enhancement.**
 
 #### How Do I Submit A (Good) Enhancement Suggestion
 
@@ -130,5 +123,4 @@ Enhancement suggestions are tracked as [GitHub issues](https://guides.github.com
 
 ### Documentation Styleguide
 
--   Use [Markdown](https://daringfireball.net/projects/markdown).
--   Documentation is built with platyPS for the markdown.
+-   Documentation is built with [platyPS](https://github.com/PowerShell/platyPS).
