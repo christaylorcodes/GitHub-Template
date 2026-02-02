@@ -243,10 +243,10 @@ New-Issue -Milestone 'v1.2.0 - Template Polish' -Labels @('ai-task', 'ai-ready',
 Add a sample private helper function and corresponding Pester test to demonstrate the Private/ pattern to template users.
 
 ## Context
-The template includes `src/Public/Get-ModuleInfo.ps1` as an example of a public function, but `src/Private/` is empty. New users have no reference for how private functions should be structured, tested (with `InModuleScope`), or documented.
+The template includes `source/Public/Get-ModuleInfo.ps1` as an example of a public function, but `source/Private/` is empty. New users have no reference for how private functions should be structured, tested (with `InModuleScope`), or documented.
 
 ## Requirements
-- [ ] Create `src/Private/Format-OutputData.ps1` (or similar utility name) as a simple private helper
+- [ ] Create `source/Private/Format-OutputData.ps1` (or similar utility name) as a simple private helper
 - [ ] Function should use comment-based help (`.SYNOPSIS`, `.DESCRIPTION`, `.PARAMETER`, `.OUTPUTS`)
 - [ ] Function should follow the style guide: approved verb, `[CmdletBinding()]`, proper parameter attributes
 - [ ] Create `Tests/Unit/Private/Format-OutputData.Tests.ps1` with Pester 5.6+ syntax
@@ -260,7 +260,7 @@ The template includes `src/Public/Get-ModuleInfo.ps1` as an example of a public 
 - [ ] Test file demonstrates `InModuleScope` usage clearly
 
 ## Files to Modify
-- `src/Private/Format-OutputData.ps1` (new)
+- `source/Private/Format-OutputData.ps1` (new)
 - `Tests/Unit/Private/Format-OutputData.Tests.ps1` (new)
 
 ## Out of Scope
@@ -280,10 +280,10 @@ New-Issue -Milestone 'v1.2.0 - Template Polish' -Labels @('ai-task', 'ai-ready',
 Add a sample PowerShell class and corresponding Pester test to demonstrate the Classes/ pattern to template users.
 
 ## Context
-The template includes `src/Classes/` in the module loader order (classes load first, before Private and Public), but the directory is empty. New users have no reference for how classes integrate with the module.
+The template includes `source/Classes/` in the module loader order (classes load first, before Private and Public), but the directory is empty. New users have no reference for how classes integrate with the module.
 
 ## Requirements
-- [ ] Create `src/Classes/ModuleConfig.ps1` (or similar) with a simple PowerShell class
+- [ ] Create `source/Classes/ModuleConfig.ps1` (or similar) with a simple PowerShell class
 - [ ] Class should demonstrate: properties, a constructor, and at least one method
 - [ ] Create `Tests/Unit/Classes/ModuleConfig.Tests.ps1` with Pester 5.6+ syntax
 - [ ] Include 2-3 test cases covering construction and method behavior
@@ -294,7 +294,7 @@ The template includes `src/Classes/` in the module loader order (classes load fi
 - [ ] Class is usable from both Private and Public functions (loaded first in module)
 
 ## Files to Modify
-- `src/Classes/ModuleConfig.ps1` (new)
+- `source/Classes/ModuleConfig.ps1` (new)
 - `Tests/Unit/Classes/ModuleConfig.Tests.ps1` (new)
 
 ## Out of Scope
@@ -340,8 +340,8 @@ Update the initialization script to handle placeholder replacement in the new ex
 Once the private function example (Format-OutputData.ps1) and class example (ModuleConfig.ps1) are added, Initialize-Repository.ps1 needs to replace `ModuleName` placeholders in those files during project setup.
 
 ## Requirements
-- [ ] Add placeholder replacement for `src/Private/Format-OutputData.ps1`
-- [ ] Add placeholder replacement for `src/Classes/ModuleConfig.ps1`
+- [ ] Add placeholder replacement for `source/Private/Format-OutputData.ps1`
+- [ ] Add placeholder replacement for `source/Classes/ModuleConfig.ps1`
 - [ ] Add placeholder replacement for `Tests/Unit/Private/Format-OutputData.Tests.ps1`
 - [ ] Add placeholder replacement for `Tests/Unit/Classes/ModuleConfig.Tests.ps1`
 - [ ] Add placeholder replacement for `Tests/Integration/ModuleIntegration.Tests.ps1`
@@ -403,7 +403,7 @@ New-Issue -Milestone 'v1.3.0 - Quality of Life' -Labels @('ai-task', 'ai-ready',
 Add documentation for setting up Codecov code coverage reporting in derived repositories.
 
 ## Context
-The `test.yml` workflow already uploads coverage data to Codecov, but there is no documentation explaining how to:
+The `ci.yml` workflow already uploads coverage data to Codecov, but there is no documentation explaining how to:
 1. Create a Codecov account and link the repo
 2. Add the `CODECOV_TOKEN` secret to GitHub
 3. Optionally add a `codecov.yml` configuration file
@@ -468,7 +468,7 @@ Currently, code quality issues are caught either during `test-local.ps1` (manual
 
 ## Requirements
 - [ ] Create `.githooks/pre-commit` script that runs PSScriptAnalyzer on staged `.ps1` files
-- [ ] Only analyze files that are staged (not the entire `src/` directory)
+- [ ] Only analyze files that are staged (not the entire `source/` directory)
 - [ ] Block commit on Error-severity findings; allow Warning-severity with a message
 - [ ] Add a setup section to AGENTS.md or CONTRIBUTING.md explaining how to enable it (`git config core.hooksPath .githooks`)
 - [ ] Make it optional — do not auto-enable during initialization

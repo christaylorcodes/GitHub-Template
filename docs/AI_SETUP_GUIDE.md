@@ -92,9 +92,9 @@ If the user has an existing PowerShell module they want to bring into this struc
 
 ### Copy Source Files
 
-1. Copy existing public functions into `src/Public/` (one function per file)
-2. Copy existing private/helper functions into `src/Private/`
-3. Copy existing classes into `src/Classes/`
+1. Copy existing public functions into `source/Public/` (one function per file)
+2. Copy existing private/helper functions into `source/Private/`
+3. Copy existing classes into `source/Classes/`
 
 ### Create Tests
 
@@ -106,7 +106,7 @@ For each function copied in, create a matching test file:
 
 ### Update the Manifest
 
-Edit `src/<ModuleName>.psd1`:
+Edit `source/<ModuleName>.psd1`:
 
 - Add any required modules to `RequiredModules`
 - Update `Tags` for PSGallery discovery
@@ -118,7 +118,7 @@ Edit `src/<ModuleName>.psd1`:
 If the existing module depends on other modules:
 
 1. Add them to `RequiredModules` in the manifest
-2. Add them to `Build/PSDepend.psd1` for build-time installation
+2. Add them to `RequiredModules.psd1` for build-time installation
 3. Add `#Requires -Modules ModuleName` to functions that need them
 
 ---
@@ -144,7 +144,7 @@ git grep "christaylor\.codes"
 ### Verify Module Functionality
 
 ```powershell
-Import-Module "./src/<ModuleName>.psd1" -Force
+Import-Module "./source/<ModuleName>.psd1" -Force
 Get-ModuleInfo
 Remove-Module "<ModuleName>" -Force
 ```
@@ -153,7 +153,7 @@ Remove-Module "<ModuleName>" -Force
 
 ```powershell
 # Bootstrap build dependencies (first time)
-./Build/build.ps1 -Bootstrap
+./build.ps1 -ResolveDependency -Tasks build
 
 # Run full pipeline (Clean -> Analyze -> Test -> Build)
 ./Tests/test-local.ps1

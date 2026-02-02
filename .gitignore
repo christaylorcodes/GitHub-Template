@@ -4,7 +4,7 @@
 
 # ---- Project-Specific ----
 Scratch*.ps1
-Output/
+output/
 coverage.xml
 testResults.xml
 nul
@@ -77,13 +77,11 @@ Sessionx.vim
 tags
 
 # ---- PowerShell ----
-PSDepend/
 modules/
 *.dll
 *.pdb
 
 # ---- Build Artifacts ----
-Output/
 bin/
 obj/
 artifacts/

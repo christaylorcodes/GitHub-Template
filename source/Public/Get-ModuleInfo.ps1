@@ -40,31 +40,30 @@ function Get-ModuleInfo {
 
     process {
         try {
-            # Get module manifest
-            $ModuleRoot = Split-Path -Parent $PSScriptRoot
-            $ManifestPath = Join-Path $ModuleRoot 'ModuleName.psd1'
+            # Get the loaded module object (works in both source and compiled modes)
+            $LoadedModule = Get-Module -Name 'ModuleName' -ErrorAction Stop |
+                Select-Object -First 1
 
-            if (-not (Test-Path $ManifestPath)) {
-                throw "Module manifest not found at: $ManifestPath"
+            if (-not $LoadedModule) {
+                throw 'ModuleName module is not loaded'
             }
 
-            Write-Debug -Message "Reading manifest from: $ManifestPath"
-            $Manifest = Import-PowerShellDataFile -Path $ManifestPath
+            Write-Debug -Message "Found module: $($LoadedModule.Name) v$($LoadedModule.Version)"
 
-            # Build output object
+            # Build output object from the loaded module
             $ModuleInfo = [PSCustomObject]@{
                 PSTypeName        = 'ModuleName.ModuleInfo'
-                Name              = $Manifest.RootModule -replace '\.psm1$', ''
-                Version           = $Manifest.ModuleVersion
-                Author            = $Manifest.Author
-                CompanyName       = $Manifest.CompanyName
-                Copyright         = $Manifest.Copyright
-                Description       = $Manifest.Description
-                PowerShellVersion = $Manifest.PowerShellVersion
-                RequiredModules   = $Manifest.RequiredModules
-                FunctionsExported = $Manifest.FunctionsToExport.Count
-                ProjectUri        = $Manifest.PrivateData.PSData.ProjectUri
-                LicenseUri        = $Manifest.PrivateData.PSData.LicenseUri
+                Name              = $LoadedModule.Name
+                Version           = $LoadedModule.Version.ToString()
+                Author            = $LoadedModule.Author
+                CompanyName       = $LoadedModule.CompanyName
+                Copyright         = $LoadedModule.Copyright
+                Description       = $LoadedModule.Description
+                PowerShellVersion = $LoadedModule.PowerShellVersion
+                RequiredModules   = $LoadedModule.RequiredModules
+                FunctionsExported = $LoadedModule.ExportedFunctions.Count
+                ProjectUri        = $LoadedModule.ProjectUri
+                LicenseUri        = $LoadedModule.LicenseUri
             }
 
             Write-Verbose -Message "Retrieved module info: $($ModuleInfo.Name) v$($ModuleInfo.Version)"

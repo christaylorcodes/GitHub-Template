@@ -73,7 +73,7 @@ Add your PSGallery API key to GitHub:
 
 ### Step 2: Update Module Manifest
 
-Edit `src/ModuleName.psd1`:
+Edit `source/ModuleName.psd1`:
 
 ```powershell
 @{
@@ -113,7 +113,7 @@ Edit `src/ModuleName.psd1`:
 
 ### Workflow Overview
 
-The `.github/workflows/test.yml`, `publish.yml`, and `analyze.yml` handle everything automatically:
+The `.github/workflows/ci.yml` pipeline handles everything automatically:
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -164,7 +164,7 @@ When you push a tag matching `v*.*.*`:
 
 ### What You Do Manually
 
-1. Update `ModuleVersion` in `src/ModuleName.psd1`
+1. Update `ModuleVersion` in `source/ModuleName.psd1`
 2. Add a version entry to `CHANGELOG.md`
 3. Run `./Tests/test-local.ps1`
 4. Commit, push, then create and push the tag
@@ -249,7 +249,7 @@ This runs the same checks as CI/CD:
 ### Stable Release (v1.0.0)
 
 ```powershell
-# 1. Update version in src/ModuleName.psd1
+# 1. Update version in source/ModuleName.psd1
 ModuleVersion = '1.0.0'
 
 # 2. Update CHANGELOG.md
@@ -401,7 +401,7 @@ publish:
 
 ```powershell
 # Run tests with detailed output
-./Build/build.ps1 -Task Test
+./build.ps1 -Tasks test
 
 # Run specific test file
 Invoke-Pester -Path tests/Unit/Module.Tests.ps1 -Output Detailed
@@ -413,11 +413,11 @@ Invoke-Pester -Path tests/Unit/Module.Tests.ps1 -Output Detailed
 
 1. **Missing dependencies**
    ```powershell
-   ./Build/build.ps1 -Bootstrap
+   ./build.ps1 -ResolveDependency -Tasks noop
    ```
 
 2. **Module version mismatch**
-   - Check `src/ModuleName.psd1` version matches expectations
+   - Check `source/ModuleName.psd1` version matches expectations
    - Verify tests aren't checking for specific versions
 
 3. **File encoding issues**
@@ -464,9 +464,8 @@ If you already have a module and want to adopt this template's CI/CD:
 
 1. Copy the CI/CD workflows:
    ```powershell
-   cp .github/workflows/test.yml <your-module>/.github/workflows/
-   cp .github/workflows/publish.yml <your-module>/.github/workflows/
-   cp .github/workflows/analyze.yml <your-module>/.github/workflows/
+   cp .github/workflows/ci.yml <your-module>/.github/workflows/
+   cp .github/workflows/pr-validation.yml <your-module>/.github/workflows/
    ```
 
 2. Copy quality tools:
@@ -477,7 +476,11 @@ If you already have a module and want to adopt this template's CI/CD:
 
 3. Copy the build system:
    ```powershell
-   cp -r Build/ <your-module>/Build/
+   cp build.ps1 <your-module>/
+   cp build.yaml <your-module>/
+   cp RequiredModules.psd1 <your-module>/
+   cp Resolve-Dependency.ps1 <your-module>/
+   cp Resolve-Dependency.psd1 <your-module>/
    ```
 
 4. Update your module's paths and names in the copied files
@@ -487,7 +490,8 @@ If you already have a module and want to adopt this template's CI/CD:
 
 - [PowerShell Gallery](https://www.powershellgallery.com)
 - [GitHub Actions Docs](https://docs.github.com/en/actions)
-- [InvokeBuild](https://github.com/nightroman/Invoke-Build)
+- [Sampler](https://github.com/gaelcolas/Sampler)
+- [ModuleBuilder](https://github.com/PoshCode/ModuleBuilder)
 - [Pester](https://pester.dev)
 - [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer)
 
@@ -500,13 +504,13 @@ If you already have a module and want to adopt this template's CI/CD:
 ./Tests/test-local.ps1
 
 # Build only
-./Build/build.ps1 -Task Build
+./build.ps1 -Tasks build
 
 # Test only
-./Build/build.ps1 -Task Test
+./build.ps1 -Tasks test
 
 # Analyze only
-./Build/build.ps1 -Task Analyze
+./build.ps1 -Tasks test
 
 # Create tag
 git tag -a v1.0.0 -m "Message"
@@ -526,6 +530,6 @@ git push origin :refs/tags/v1.0.0
 
 ### Files to Update for New Release
 
-1. `src/ModuleName.psd1` — set `ModuleVersion` to match your planned tag (e.g., `1.2.0` for tag `v1.2.0`)
+1. `source/ModuleName.psd1` — set `ModuleVersion` to match your planned tag (e.g., `1.2.0` for tag `v1.2.0`)
 2. `CHANGELOG.md` — add a `## [1.2.0] - YYYY-MM-DD` section
 3. Create and push git tag — **must match manifest version** or the workflow will fail

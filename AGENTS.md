@@ -7,7 +7,7 @@ This file provides context for AI coding agents (Claude Code, GitHub Copilot, Cu
 **ModuleName** is a PowerShell module hosted at <https://github.com/YOUR-USERNAME/YOUR-REPO>.
 
 - **Language**: PowerShell 7.2+
-- **Build System**: InvokeBuild
+- **Build System**: Sampler / ModuleBuilder
 - **Test Framework**: Pester 5.6+
 - **Linter**: PSScriptAnalyzer
 - **License**: MIT
@@ -16,10 +16,10 @@ This file provides context for AI coding agents (Claude Code, GitHub Copilot, Cu
 
 ```powershell
 # Bootstrap dependencies (required first time)
-./Build/build.ps1 -Bootstrap
+./build.ps1 -ResolveDependency -Tasks noop
 
-# Run full pipeline (Clean -> Analyze -> Test -> Build)
-./Build/build.ps1
+# Run full pipeline (Clean -> Build -> Test)
+./build.ps1
 
 # Local pre-push validation (build + analyze + test)
 ./Tests/test-local.ps1
@@ -27,23 +27,16 @@ This file provides context for AI coding agents (Claude Code, GitHub Copilot, Cu
 
 ## Build Commands
 
-All commands require **PowerShell 7.2+** and use InvokeBuild as the task runner.
+All commands require **PowerShell 7.2+** and use Sampler/ModuleBuilder with InvokeBuild as the task runner. Configuration lives in `build.yaml` and `RequiredModules.psd1`.
 
 ```powershell
 # Individual tasks
-./Build/build.ps1 -Task Test        # Run Pester tests
-./Build/build.ps1 -Task Analyze     # Run PSScriptAnalyzer
-./Build/build.ps1 -Task Build       # Build module to Output/
-./Build/build.ps1 -Task Clean       # Clean build artifacts
-./Build/build.ps1 -Task Install     # Install locally for testing
+./build.ps1 -Tasks test             # Run Pester tests (builds first)
+./build.ps1 -Tasks build            # Build module to output/
+./build.ps1 -Tasks publish          # Publish to PowerShell Gallery
 
-# Documentation tasks (see PowerShell-StyleGuide.md > Comment-Based Help for workflow and pitfalls)
-./Build/build.ps1 -Task GenerateDocs  # Generate markdown help from comment-based help
-./Build/build.ps1 -Task UpdateDocs    # Update existing markdown help files
-./Build/build.ps1 -Task BuildHelp     # Build XML external help from markdown
-
-# Multiple tasks
-./Build/build.ps1 -Task Clean, Build, Test
+# Bootstrap + build (first time or after dependency changes)
+./build.ps1 -ResolveDependency -Tasks build
 
 # Local validation (build + analyze + test)
 ./Tests/test-local.ps1
@@ -58,16 +51,17 @@ All commands require **PowerShell 7.2+** and use InvokeBuild as the task runner.
 
 ```
 YOUR-REPO/
-  src/
+  build.ps1                  # Sampler bootstrap and task runner (vendor)
+  build.yaml                 # Build pipeline configuration
+  RequiredModules.psd1       # Build dependency specifications
+  Resolve-Dependency.ps1     # Dependency resolver (vendor)
+  Resolve-Dependency.psd1    # Resolver configuration
+  source/
     ModuleName.psd1          # Module manifest
     ModuleName.psm1          # Root module (auto-loads subdirectories)
     Classes/                 # PowerShell class definitions (loaded first)
     Private/                 # Internal helper functions (not exported)
     Public/                  # Exported functions (one file per function)
-  Build/
-    build.ps1                # Entry point (bootstraps dependencies)
-    ModuleName.build.ps1     # InvokeBuild task definitions
-    PSDepend.psd1            # Build dependency specs
   Tests/
     Unit/Public/             # Tests for exported functions
     Unit/Private/            # Tests for internal functions
@@ -75,7 +69,7 @@ YOUR-REPO/
     TestHelpers/             # Shared test utilities
   Templates/                 # Boilerplate for new functions/tests
   Scripts/                   # Automation scripts
-  Output/                    # Build output (gitignored)
+  output/                    # Build output (gitignored)
   docs/                      # Documentation and media assets
     media/                   # Logo, demo GIF, donation QR codes
 ```
@@ -92,23 +86,22 @@ The root directory is kept minimal — only files that tools or conventions requ
 Everything else is organized by purpose:
 
 - **`.github/`** — GitHub-specific files: workflows, issue templates, PR template, and community docs (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`). GitHub natively recognizes community health files in this folder.
-- **`src/`** — Module source code only. No tests, no build scripts, no docs.
-- **`Build/`** — Build system isolated from source. Entry point, task definitions, and dependency specs.
-- **`Tests/`** — All test code and the local validation script (`test-local.ps1`). Mirrors `src/` structure with `Unit/Public/`, `Unit/Private/`, and `Integration/`.
+- **`source/`** — Module source code only. No tests, no build scripts, no docs.
+- **`Tests/`** — All test code and the local validation script (`test-local.ps1`). Mirrors `source/` structure with `Unit/Public/`, `Unit/Private/`, and `Integration/`.
 - **`docs/`** — All documentation and media assets (`docs/media/`). Keeps images, guides, and help files together rather than scattered across root.
 - **`Scripts/`** — Developer automation (scaffolding, initialization, validation). Not part of the module itself.
 - **`Templates/`** — Code generation boilerplate. Separate from `Scripts/` because templates are passive data files, not executable automation.
 
 ### Module Loading Order
 
-The `.psm1` file auto-discovers and dot-sources files: Classes -> Private -> Public. Only Public functions are exported via `Export-ModuleMember`. No registration step is needed when adding new files.
+During development, the source `.psm1` auto-discovers and dot-sources files: Classes -> Private -> Public. When built with ModuleBuilder (`./build.ps1 -Tasks build`), all source files are compiled into a single `.psm1` in `output/`. No registration step is needed when adding new files — ModuleBuilder discovers them automatically.
 
 ### Organizing Large Modules
 
 For modules with many functions, organize `Public/` into domain subdirectories:
 
 ```
-src/Public/
+source/Public/
   Authentication/
     Connect-MyService.ps1
     Disconnect-MyService.ps1
@@ -120,27 +113,30 @@ src/Public/
     Update-Ticket.ps1
 ```
 
-The `.psm1` uses `-Recurse`, so subdirectories work automatically — all `.ps1` files under `Public/` are exported regardless of nesting depth. The same applies to `Private/` and `Classes/`. Recommended when a module exceeds ~20 exported functions.
+ModuleBuilder discovers files recursively — all `.ps1` files under `Public/` are exported regardless of nesting depth. The same applies to `Private/` and `Classes/`. Recommended when a module exceeds ~20 exported functions.
 
 ### Build System
 
-- `Build/build.ps1` — entry point, installs PSDepend and InvokeBuild if missing
-- `Build/ModuleName.build.ps1` — task definitions (Clean, Analyze, Test, Build, Publish, Install)
-- `Build/PSDepend.psd1` — build dependency specifications
-- Build output goes to `Output/ModuleName/`
+Uses [Sampler](https://github.com/gaelcolas/Sampler) + [ModuleBuilder](https://github.com/PoshCode/ModuleBuilder):
+
+- `build.yaml` — declarative pipeline configuration (tasks, Pester settings, PSScriptAnalyzer settings)
+- `RequiredModules.psd1` — build dependency specifications (resolved to `output/RequiredModules/`)
+- `build.ps1` — Sampler bootstrap and InvokeBuild wrapper (vendor file)
+- `Resolve-Dependency.ps1` — multi-strategy dependency resolver: ModuleFast / PSResourceGet / PSDepend (vendor file)
+- Build output goes to `output/ModuleName/<version>/`
 
 ### Test Framework
 
-- Pester 5.6+ with configuration-based invocation
-- Code coverage targets `src/Public/*.ps1` and `src/Private/*.ps1`
-- Coverage output: JaCoCo format to `coverage.xml`
-- Test results: NUnit format to `testResults.xml`
+- Pester 5.6+ with configuration in `build.yaml`
+- Test results: NUnit format to `output/testResults/testResults.xml`
+- Tests can run against the built module in `output/` (via `./build.ps1 -Tasks test`) or against source directly (via `Invoke-QuickTest.ps1`)
 
 ### CI/CD
 
-- `test.yml` — Tests (Ubuntu + Windows matrix) on push/PR to main/develop
-- `analyze.yml` — PSScriptAnalyzer on push/PR + weekly schedule
-- `publish.yml` — Publishes to PowerShell Gallery on GitHub release (requires `PSGALLERY_API_KEY` secret)
+- `ci.yml` — Unified pipeline: Build → Test (Ubuntu + Windows matrix) → Analyze → Publish (tag-gated)
+- `pr-validation.yml` — CHANGELOG and version checks on pull requests
+- Version is extracted from git tags (`v1.2.3` for stable, `v1.2.3-beta1` for prerelease)
+- Publishing requires `PSGALLERY_API_KEY` secret
 
 ## Common Patterns
 
@@ -199,7 +195,7 @@ Enforced by PSScriptAnalyzer (`.PSScriptAnalyzerSettings.psd1`) and `.editorconf
 
 ## Adding New Functions
 
-1. Create the function file at `src/Public/Verb-Noun.ps1` (or `src/Private/` for internal helpers). For larger modules, use domain subdirectories: `src/Public/ServiceArea/Verb-Noun.ps1`
+1. Create the function file at `source/Public/Verb-Noun.ps1` (or `source/Private/` for internal helpers). For larger modules, use domain subdirectories: `source/Public/ServiceArea/Verb-Noun.ps1`
 2. Use `Templates/Function.ps1` (Public) or `Templates/PrivateFunction.ps1` (Private) as the starting template
 3. Create matching test:
    - Public: `Tests/Unit/Public/Verb-Noun.Tests.ps1` (use `Templates/Test.Tests.ps1`)
@@ -283,7 +279,7 @@ It 'Should process data correctly' {
 - Zero PSScriptAnalyzer **errors** required for all code
 - Warnings are acceptable but should be minimized
 - Use `.PSScriptAnalyzerSettings.psd1` for project rules
-- Run standalone: `Invoke-ScriptAnalyzer -Path ./src -Recurse -Settings ./.PSScriptAnalyzerSettings.psd1`
+- Run standalone: `Invoke-ScriptAnalyzer -Path ./source -Recurse -Settings ./.PSScriptAnalyzerSettings.psd1`
 
 ## AI Contribution Workflow
 

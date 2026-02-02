@@ -11,15 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Build System
 
-- InvokeBuild-based build pipeline (`Build/build.ps1`, `Build/ModuleName.build.ps1`)
-- Build dependency manifest (`Build/PSDepend.psd1`) for InvokeBuild, Pester, PSScriptAnalyzer, platyPS
-- Local pre-push validation script (`test-local.ps1`)
+- Sampler/ModuleBuilder build pipeline (`build.ps1`, `build.yaml`, `RequiredModules.psd1`)
+- Multi-strategy dependency resolver (`Resolve-Dependency.ps1`)
+- Local pre-push validation script (`Tests/test-local.ps1`)
 
 #### Module Structure
 
-- PowerShell module manifest and loader (`src/ModuleName.psd1`, `src/ModuleName.psm1`)
+- PowerShell module manifest and loader (`source/ModuleName.psd1`, `source/ModuleName.psm1`)
 - Auto-discovery module loader (Classes, Private, Public)
-- Example public function (`src/Public/Get-ModuleInfo.ps1`)
+- Example public function (`source/Public/Get-ModuleInfo.ps1`)
 
 #### Templates
 
@@ -42,9 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### CI/CD Workflows
 
-- Test workflow (`.github/workflows/test.yml`) with Pester and code coverage
-- PSScriptAnalyzer workflow (`.github/workflows/analyze.yml`) with weekly schedule
-- PSGallery publish workflow (`.github/workflows/publish.yml`) triggered by GitHub releases
+- Unified CI/CD pipeline (`.github/workflows/ci.yml`) — Build → Test (matrix) → Analyze → Publish
+- PR validation workflow (`.github/workflows/pr-validation.yml`) — CHANGELOG and version checks
 
 #### AI Integration
 
@@ -73,21 +72,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.vscode/settings.json` and `.vscode/extensions.json`
 
 ### Changed
+
+- Migrated build system to Sampler/ModuleBuilder (replaced custom InvokeBuild scripts)
+- Renamed module source directory from `src/` to `source/` (Sampler convention)
 - Standardized on PowerShell 7+ only (removed Desktop/5.1 compatibility)
-- Consolidated build system to InvokeBuild only (removed Sampler/ModuleBuilder)
 - Removed PSFramework as default dependency (use Write-Verbose/Write-Debug instead)
 - Trimmed .gitignore to PowerShell-focused patterns
 - Replaced PSFramework logging in Templates/ with native PowerShell cmdlets
 
 ### Removed
-- Sampler build system files (build-sampler.ps1, build.yaml, RequiredModules.psd1, Resolve-Dependency.ps1)
-- Redundant CI workflows (ci.yml, pr-validation.yml) — use test.yml, publish.yml, analyze.yml
+
+- Custom InvokeBuild build scripts (`Build/build.ps1`, `Build/ModuleName.build.ps1`, `Build/PSDepend.psd1`)
+- Individual CI workflows (test.yml, analyze.yml, publish.yml) — replaced by unified `ci.yml`
 - Duplicate PSScriptAnalyzerSettings.psd1 (keeping .PSScriptAnalyzerSettings.psd1)
 - Redundant documentation (WHATS_NEW.md, SETUP_CHECKLIST.md, TEMPLATE_IMPROVEMENTS.md, MAP.md, gantt.mmd)
 
 ### Fixed
-- Fixed test-local.ps1 to use InvokeBuild system (was referencing non-existent Sampler paths)
-- Fixed source/ path references to src/ across all documentation
+
+- Fixed test-local.ps1 to use Sampler/ModuleBuilder build system
+- Fixed `src/` path references to `source/` across all documentation
 - Updated Pester dependency from 5.3.1 to 5.6.1
 - Added PowerShell 7.5 to PSScriptAnalyzer compatibility targets
 

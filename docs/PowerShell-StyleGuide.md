@@ -189,9 +189,9 @@ Private functions: `.SYNOPSIS`, `.PARAMETER`, and one `.EXAMPLE` are sufficient.
 Comment-based help is the **source of truth** for all documentation. The build system uses PlatyPS to generate markdown and MAML XML from it:
 
 ```powershell
-./Build/build.ps1 -Task GenerateDocs  # Fresh markdown from comment-based help
-./Build/build.ps1 -Task UpdateDocs    # Update existing markdown files
-./Build/build.ps1 -Task BuildHelp     # Build MAML XML from markdown
+./build.ps1 -Tasks docs  # Fresh markdown from comment-based help
+./build.ps1 -Tasks docs  # Update existing markdown files
+./build.ps1 -Tasks docs  # Build MAML XML from markdown
 ```
 
 **Flow:** `.ps1` comment-based help → `Get-Help` → PlatyPS → Markdown (`docs/`) → MAML XML (`en-US/`). Do not manually edit the generated markdown or XML files — update the comment-based help in the source `.ps1` files and regenerate.

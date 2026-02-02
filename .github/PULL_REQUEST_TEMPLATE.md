@@ -2,7 +2,11 @@
 
 ## Description
 
-<!-- What does this PR do? Reference the issue: Fixes #123 -->
+<!-- What does this PR do? Brief summary of the changes. -->
+
+## Related Issue
+
+<!-- Reference the issue: Fixes #123 -->
 
 ## Type of Change
 
@@ -11,6 +15,13 @@
 - [ ] Breaking change
 - [ ] Documentation
 - [ ] Refactoring / tests
+
+## Changes Made
+
+<!-- Bullet list of what changed -->
+
+-
+-
 
 ## Testing
 
@@ -23,7 +34,12 @@
 - [ ] Code follows project conventions ([AGENTS.md](../AGENTS.md))
 - [ ] Tests cover new/changed behavior
 - [ ] PSScriptAnalyzer reports zero errors
+- [ ] CHANGELOG.md updated (if applicable)
 - [ ] Documentation updated (if applicable)
+
+## Screenshots
+
+<!-- If applicable, add screenshots to help explain your changes -->
 
 ## AI Contribution
 

@@ -15,13 +15,13 @@ if ($Quick) {
 
     if ($FunctionName) {
         Write-Host "`n[QUICK] Running targeted test for: $FunctionName" -ForegroundColor Yellow
-        & "$PSScriptRoot\Scripts\Invoke-QuickTest.ps1" -FunctionName $FunctionName -IncludeAnalyzer:(-not $SkipAnalyze)
+        & ".\Scripts\Invoke-QuickTest.ps1" -FunctionName $FunctionName -IncludeAnalyzer:(-not $SkipAnalyze)
         exit $LASTEXITCODE
     }
 
     # Quick without function name: run all tests directly (no build, no coverage)
     Write-Host "`n[QUICK] Running all tests (no build, no coverage)..." -ForegroundColor Yellow
-    & "$PSScriptRoot\Scripts\Invoke-QuickTest.ps1" -IncludeAnalyzer:(-not $SkipAnalyze)
+    & ".\Scripts\Invoke-QuickTest.ps1" -IncludeAnalyzer:(-not $SkipAnalyze)
     exit $LASTEXITCODE
 }
 
@@ -34,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 # 1. BUILD
 if (-not $SkipBuild) {
     Write-Host "[1/3] Building module..." -ForegroundColor Yellow
-    & ./Build/build.ps1 -Task Build
+    & ./build.ps1 -Tasks build
     if ($LASTEXITCODE -ne 0) {
         Write-Host "BUILD FAILED" -ForegroundColor Red
         exit 1
@@ -47,7 +47,7 @@ if (-not $SkipAnalyze) {
     Write-Host "[2/3] Running PSScriptAnalyzer..." -ForegroundColor Yellow
     Import-Module PSScriptAnalyzer
 
-    $results = Invoke-ScriptAnalyzer -Path ./src -Recurse -Settings ./.PSScriptAnalyzerSettings.psd1
+    $results = Invoke-ScriptAnalyzer -Path ./source -Recurse -Settings ./.PSScriptAnalyzerSettings.psd1
 
     if ($results) {
         $results | Format-Table -AutoSize
@@ -72,14 +72,14 @@ if (-not $SkipTests) {
 
     if ($FunctionName) {
         Write-Host "Targeted test for: $FunctionName" -ForegroundColor Cyan
-        & "$PSScriptRoot\Scripts\Invoke-QuickTest.ps1" -FunctionName $FunctionName
+        & ".\Scripts\Invoke-QuickTest.ps1" -FunctionName $FunctionName
         if ($LASTEXITCODE -ne 0) {
             Write-Host "TESTS FAILED" -ForegroundColor Red
             exit 1
         }
     }
     else {
-        & ./Build/build.ps1 -Task Test
+        & ./build.ps1 -Tasks test
         if ($LASTEXITCODE -ne 0) {
             Write-Host "TESTS FAILED" -ForegroundColor Red
             exit 1

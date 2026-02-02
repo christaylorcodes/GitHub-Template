@@ -54,7 +54,7 @@ Describe 'ModuleName Module' -Tag 'Unit', 'Module' {
 
     Context 'Exported Functions' {
         BeforeAll {
-            $publicPath = Join-Path $script:ProjectRoot 'src' 'Public'
+            $publicPath = Join-Path $script:ProjectRoot 'source' 'Public'
             $script:PublicFunctions = Get-ChildItem -Path $publicPath -Filter '*.ps1' -ErrorAction SilentlyContinue
             $script:ExportedCommands = $script:ModuleInfo.ExportedCommands.Keys
         }
@@ -70,7 +70,7 @@ Describe 'ModuleName Module' -Tag 'Unit', 'Module' {
         }
 
         It 'Should not export any private functions' {
-            $privatePath = Join-Path $script:ProjectRoot 'src' 'Private'
+            $privatePath = Join-Path $script:ProjectRoot 'source' 'Private'
             $privateFunctions = Get-ChildItem -Path $privatePath -Filter '*.ps1' -ErrorAction SilentlyContinue
             foreach ($file in $privateFunctions) {
                 $script:ExportedCommands | Should -Not -Contain $file.BaseName

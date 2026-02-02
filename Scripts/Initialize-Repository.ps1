@@ -249,7 +249,7 @@ if (Test-Path ".\.github\CODE_OF_CONDUCT.md") {
 
 # Update module manifest
 Write-Step "Customizing Module Source Files"
-$manifestFile = ".\src\ModuleName.psd1"
+$manifestFile = ".\source\ModuleName.psd1"
 if (Test-Path $manifestFile) {
     $manifest = Get-Content $manifestFile -Raw
     $guidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
@@ -271,7 +271,7 @@ if (Test-Path $manifestFile) {
 }
 
 # Update example function
-$exampleFunction = ".\src\Public\Get-ModuleInfo.ps1"
+$exampleFunction = ".\source\Public\Get-ModuleInfo.ps1"
 if (Test-Path $exampleFunction) {
     $content = Get-Content $exampleFunction -Raw
     $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
@@ -284,7 +284,7 @@ if (Test-Path $exampleFunction) {
 }
 
 # Update root module file
-$rootModule = ".\src\ModuleName.psm1"
+$rootModule = ".\source\ModuleName.psm1"
 if (Test-Path $rootModule) {
     $content = Get-Content $rootModule -Raw
     $content = $content -replace 'Your Name', $Author
@@ -292,17 +292,6 @@ if (Test-Path $rootModule) {
     if ($PSCmdlet.ShouldProcess("$ModuleName.psm1", 'Replace placeholders')) {
         Set-Content -Path $rootModule -Value $content -NoNewline
         Write-Success "Root module file customized"
-    }
-}
-
-# Update build task file
-$buildFile = ".\Build\ModuleName.build.ps1"
-if (Test-Path $buildFile) {
-    $content = Get-Content $buildFile -Raw
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess("$ModuleName.build.ps1", 'Replace placeholders')) {
-        Set-Content -Path $buildFile -Value $content -NoNewline
-        Write-Success "Build task file customized"
     }
 }
 
@@ -434,9 +423,8 @@ if (Test-Path $usageDoc) {
 # Rename module files
 Write-Step "Renaming Module Files"
 $fileRenames = @(
-    @{ Source = ".\src\ModuleName.psd1"; Target = "$ModuleName.psd1" }
-    @{ Source = ".\src\ModuleName.psm1"; Target = "$ModuleName.psm1" }
-    @{ Source = ".\Build\ModuleName.build.ps1"; Target = "$ModuleName.build.ps1" }
+    @{ Source = ".\source\ModuleName.psd1"; Target = "$ModuleName.psd1" }
+    @{ Source = ".\source\ModuleName.psm1"; Target = "$ModuleName.psm1" }
 )
 foreach ($rename in $fileRenames) {
     $sourceName = Split-Path -Leaf $rename.Source
@@ -587,9 +575,9 @@ Write-Host "  GitHub:      https://github.com/$GitHubUsername/$RepositoryName"
 Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Yellow
 $stepNum = 1
-Write-Host "  $stepNum. Verify module loads: Import-Module ./src/$ModuleName.psd1 -Force"
+Write-Host "  $stepNum. Verify module loads: Import-Module ./source/$ModuleName.psd1 -Force"
 $stepNum++
-Write-Host "  $stepNum. Run build: ./Build/build.ps1 -Bootstrap"
+Write-Host "  $stepNum. Run build: ./build.ps1 -ResolveDependency -Tasks build"
 $stepNum++
 Write-Host "  $stepNum. Run tests: ./Tests/test-local.ps1"
 $stepNum++

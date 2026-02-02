@@ -58,7 +58,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $TestsPath = Join-Path $ProjectRoot 'Tests'
-$SourcePath = Join-Path $ProjectRoot 'src'
+$SourcePath = Join-Path $ProjectRoot 'source'
 
 # --- Resolve test path ---
 

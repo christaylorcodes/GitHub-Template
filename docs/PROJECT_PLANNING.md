@@ -213,7 +213,7 @@ Add configurable retry logic with exponential backoff to Invoke-ApiCall.
 - [ ] PSScriptAnalyzer reports zero errors
 
 ## Files to Modify
-- src/Private/Invoke-ApiCall.ps1
+- source/Private/Invoke-ApiCall.ps1
 - Tests/Unit/Private/Invoke-ApiCall.Tests.ps1
 EOF
 )"

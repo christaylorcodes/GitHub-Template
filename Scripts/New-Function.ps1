@@ -50,7 +50,7 @@ param(
 # Get project root
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $TemplatesPath = Join-Path $ProjectRoot 'Templates'
-$SourcePath = Join-Path $ProjectRoot 'src'
+$SourcePath = Join-Path $ProjectRoot 'source'
 $TestsPath = Join-Path $ProjectRoot 'Tests'
 
 # Determine module name if not specified

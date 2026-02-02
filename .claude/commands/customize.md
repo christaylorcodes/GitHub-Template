@@ -39,10 +39,10 @@ Work through each item that needs attention. Ask the user for input where needed
 Ask the user if they have existing PowerShell code to bring into this project. If yes:
 
 1. Help them identify which functions are public vs private
-2. Copy functions into `src/Public/` and `src/Private/` (one per file)
+2. Copy functions into `source/Public/` and `source/Private/` (one per file)
 3. Create matching test files using the templates in `Templates/`
 4. Update the module manifest (`RequiredModules`, `Tags`, etc.)
-5. Run `Import-Module ./src/<ModuleName>.psd1 -Force` to verify it loads
+5. Run `Import-Module ./source/<ModuleName>.psd1 -Force` to verify it loads
 
 ## Step 5: Validate
 
@@ -56,7 +56,7 @@ git grep "yourdomain.com"
 git grep "christaylorcodes"
 
 # Verify module loads
-Import-Module "./src/<ModuleName>.psd1" -Force
+Import-Module "./source/<ModuleName>.psd1" -Force
 
 # Run tests
 ./Tests/test-local.ps1

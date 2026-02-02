@@ -43,11 +43,11 @@ This template gives you everything needed to publish a professional PowerShell m
 
 | Category | What You Get | Details |
 | -------- | ------------ | ------- |
-| **Build System** | InvokeBuild pipeline with Clean, Analyze, Test, Build, and Publish tasks | [AGENTS.md — Build System](AGENTS.md#build-system) |
+| **Build System** | Sampler/ModuleBuilder pipeline with Clean, Build, Test, and Publish tasks | [AGENTS.md — Build System](AGENTS.md#build-system) |
 | **Testing** | Pester 5.6+ with code coverage (JaCoCo) and NUnit results | [AGENTS.md — Test Framework](AGENTS.md#test-framework) |
 | **Code Quality** | PSScriptAnalyzer with tuned rule set and editor integration | [.PSScriptAnalyzerSettings.psd1](.PSScriptAnalyzerSettings.psd1) |
 | **CI/CD Workflows** | GitHub Actions for testing, analysis, and PSGallery publishing | [AGENTS.md — CI/CD](AGENTS.md#cicd) |
-| **Module Structure** | Auto-discovering `src/` layout with Classes, Private, and Public folders | [AGENTS.md — Architecture](AGENTS.md#architecture) |
+| **Module Structure** | Auto-discovering `source/` layout with Classes, Private, and Public folders | [AGENTS.md — Architecture](AGENTS.md#architecture) |
 | **Documentation** | Comment-based help, platyPS markdown docs, usage guides | [docs/](docs/) |
 | **Templates** | Boilerplate for new functions, classes, and Pester tests | [Templates/](Templates/) |
 | **Automation Scripts** | Repository initialization, validation, badge generation, label setup | [Scripts/](Scripts/) |
@@ -119,15 +119,15 @@ This repository is designed for AI-assisted development from the ground up. Whet
 
 ```text
 your-module/
-  src/
+  build.ps1                      # Sampler bootstrap and task runner
+  build.yaml                     # Build pipeline configuration
+  RequiredModules.psd1           # Build dependency specifications
+  source/
     ModuleName.psd1              # Module manifest
     ModuleName.psm1              # Root module (auto-loads subdirectories)
     Classes/                     # PowerShell class definitions
     Private/                     # Internal helper functions
     Public/                      # Exported functions (one per file)
-  Build/
-    build.ps1                    # Entry point (bootstraps dependencies)
-    ModuleName.build.ps1         # InvokeBuild task definitions
   Tests/
     Unit/Public/                 # Tests for exported functions
     Unit/Private/                # Tests for internal functions

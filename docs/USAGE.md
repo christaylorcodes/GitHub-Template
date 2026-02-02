@@ -22,8 +22,8 @@ git clone https://github.com/YOUR-USERNAME/ModuleName.git
 cd ModuleName
 
 # Build and install
-.\Build\build.ps1 -Bootstrap
-.\Build\build.ps1 -Task Install
+.\build.ps1 -ResolveDependency -Tasks noop
+.\build.ps1 -Tasks build
 ```
 
 ## Quick Start

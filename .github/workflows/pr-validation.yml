@@ -1,0 +1,112 @@
+# GitHub Actions PR Validation Workflow
+# Validates PRs before merging to main
+#
+# Checks:
+#   - CHANGELOG.md has been updated
+#   - Warns if version hasn't been bumped (informational only)
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    types: [opened, synchronize, reopened]
+
+env:
+  MODULE_NAME: ModuleName
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CHANGELOG Updated
+        shell: pwsh
+        run: |
+          $ChangedFiles = git diff --name-only origin/${{ github.base_ref }}...HEAD
+
+          if ($ChangedFiles -notcontains 'CHANGELOG.md') {
+              Write-Host "::warning::CHANGELOG.md has not been updated in this PR"
+              Write-Host "Consider adding release notes for your changes"
+          } else {
+              Write-Host "CHANGELOG.md has been updated"
+          }
+
+      - name: Validate CHANGELOG Format
+        shell: pwsh
+        run: |
+          if (Test-Path 'CHANGELOG.md') {
+              $Changelog = Get-Content -Path 'CHANGELOG.md' -Raw
+
+              # Check for Unreleased section
+              if ($Changelog -notmatch '\[Unreleased\]') {
+                  Write-Host "::warning::CHANGELOG.md should have an [Unreleased] section for pending changes"
+              }
+
+              # Check for Keep a Changelog format
+              if ($Changelog -match '## \[\d+\.\d+\.\d+\]') {
+                  Write-Host "CHANGELOG.md follows semantic versioning format"
+              }
+          } else {
+              Write-Host "::warning::No CHANGELOG.md found"
+          }
+
+      - name: Check Version (Informational)
+        shell: pwsh
+        run: |
+          # Get current version from PR branch
+          $ManifestPath = Get-ChildItem -Path "source/*.psd1" | Select-Object -First 1
+          if (-not $ManifestPath) {
+              Write-Host "::warning::No module manifest found in source/"
+              exit 0
+          }
+
+          $PRManifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
+          $PRVersion = [version]$PRManifest.ModuleVersion
+
+          # Get version from base branch
+          git fetch origin ${{ github.base_ref }} --quiet
+          git checkout origin/${{ github.base_ref }} -- $ManifestPath.FullName 2>$null
+
+          if (Test-Path $ManifestPath.FullName) {
+              $BaseManifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
+              $BaseVersion = [version]$BaseManifest.ModuleVersion
+
+              # Restore PR version
+              git checkout HEAD -- $ManifestPath.FullName
+
+              Write-Host "Base version: $BaseVersion"
+              Write-Host "PR version: $PRVersion"
+
+              if ($PRVersion -le $BaseVersion) {
+                  Write-Host "::notice::Version in manifest has not been bumped"
+                  Write-Host "This is OK - version will be set from git tag during release"
+              } else {
+                  Write-Host "Version bump detected: $BaseVersion -> $PRVersion"
+              }
+          } else {
+              # Restore PR version
+              git checkout HEAD -- $ManifestPath.FullName
+              Write-Host "New module - version is $PRVersion"
+          }
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "========================================="
+          Write-Host "PR Validation Complete"
+          Write-Host "========================================="
+          Write-Host ""
+          Write-Host "Remember:"
+          Write-Host "  - Version is set from git tag, not manifest"
+          Write-Host "  - Tag format: v1.2.3 (stable) or v1.2.3-beta1 (prerelease)"
+          Write-Host "  - Update CHANGELOG.md with your changes"

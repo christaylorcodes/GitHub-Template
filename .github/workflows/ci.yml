@@ -1,0 +1,283 @@
+# GitHub Actions CI/CD Pipeline for PowerShell Modules
+# Uses Sampler/ModuleBuilder build system
+#
+# Branch Strategy:
+#   - prerelease: Active development, tag v*.*.*-label to publish prerelease
+#   - main: Stable releases only, tag v*.*.* to publish stable
+#
+# Version is extracted from git tag - no need to update manifest manually
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - prerelease
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  MODULE_NAME: ModuleName
+
+jobs:
+  # ============================================
+  # BUILD JOB
+  # ============================================
+  build:
+    name: Build Module
+    runs-on: ubuntu-latest
+    outputs:
+      module_version: ${{ steps.version.outputs.version }}
+      semver: ${{ steps.version.outputs.semver }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      should_publish: ${{ steps.version.outputs.should_publish }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Version
+        id: version
+        shell: pwsh
+        run: |
+          $IsTag = '${{ github.ref_type }}' -eq 'tag'
+          $TagName = '${{ github.ref_name }}'
+
+          if ($IsTag -and $TagName -match '^v(\d+\.\d+\.\d+.*)$') {
+              # Extract version from tag (v3.1.0-beta1 -> 3.1.0-beta1)
+              $SemVer = $Matches[1]
+              $ShouldPublish = 'true'
+
+              # Check if prerelease (has suffix like -beta1, -rc1, -alpha1)
+              if ($SemVer -match '^(\d+\.\d+\.\d+)-(.+)$') {
+                  $Version = $Matches[1]
+                  $IsPrerelease = 'true'
+              } else {
+                  $Version = $SemVer
+                  $IsPrerelease = 'false'
+              }
+          } else {
+              # Not a tag - use manifest version for build only
+              $ManifestPath = Get-ChildItem -Path "source/*.psd1" | Select-Object -First 1
+              if ($ManifestPath) {
+                  $Manifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
+                  $Version = $Manifest.ModuleVersion
+              } else {
+                  $Version = '0.0.1'
+              }
+              $SemVer = $Version
+              $IsPrerelease = 'false'
+              $ShouldPublish = 'false'
+          }
+
+          Write-Host "Version: $Version"
+          Write-Host "SemVer: $SemVer"
+          Write-Host "Is Prerelease: $IsPrerelease"
+          Write-Host "Should Publish: $ShouldPublish"
+
+          "version=$Version" >> $env:GITHUB_OUTPUT
+          "semver=$SemVer" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$IsPrerelease" >> $env:GITHUB_OUTPUT
+          "should_publish=$ShouldPublish" >> $env:GITHUB_OUTPUT
+
+      - name: Resolve Dependencies
+        shell: pwsh
+        run: |
+          ./build.ps1 -ResolveDependency -Tasks noop
+
+      - name: Build Module
+        shell: pwsh
+        env:
+          ModuleVersion: ${{ steps.version.outputs.semver }}
+        run: |
+          ./build.ps1 -Tasks build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-build
+          path: output/${{ env.MODULE_NAME }}
+          retention-days: 7
+
+      - name: Upload Required Modules
+        uses: actions/upload-artifact@v4
+        with:
+          name: required-modules
+          path: output/RequiredModules
+          retention-days: 1
+
+  # ============================================
+  # TEST JOB
+  # ============================================
+  test:
+    name: Test (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: module-build
+          path: output/${{ env.MODULE_NAME }}
+
+      - name: Download Required Modules
+        uses: actions/download-artifact@v4
+        with:
+          name: required-modules
+          path: output/RequiredModules
+
+      - name: Run Pester Tests
+        shell: pwsh
+        run: |
+          $env:PSModulePath = "$(Resolve-Path output/RequiredModules)" + [IO.Path]::PathSeparator + $env:PSModulePath
+          ./build.ps1 -Tasks test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: output/testResults/
+          retention-days: 30
+
+  # ============================================
+  # ANALYZE JOB
+  # ============================================
+  analyze:
+    name: PSScriptAnalyzer
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Required Modules
+        uses: actions/download-artifact@v4
+        with:
+          name: required-modules
+          path: output/RequiredModules
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $env:PSModulePath = "$(Resolve-Path output/RequiredModules)" + [IO.Path]::PathSeparator + $env:PSModulePath
+          Import-Module PSScriptAnalyzer
+
+          $SettingsFile = '.PSScriptAnalyzerSettings.psd1'
+          $AnalyzerParams = @{
+              Path    = 'source'
+              Recurse = $true
+          }
+          if (Test-Path $SettingsFile) {
+              $AnalyzerParams.Settings = $SettingsFile
+          }
+
+          $Results = Invoke-ScriptAnalyzer @AnalyzerParams
+
+          if ($Results) {
+              $Results | Format-Table -AutoSize
+              $Errors = $Results | Where-Object Severity -eq 'Error'
+              if ($Errors) {
+                  throw "PSScriptAnalyzer found $($Errors.Count) error(s)"
+              }
+          } else {
+              Write-Host "No PSScriptAnalyzer issues found"
+          }
+
+  # ============================================
+  # PUBLISH JOB
+  # ============================================
+  publish:
+    name: Publish to PSGallery
+    needs: [build, test, analyze]
+    runs-on: ubuntu-latest
+    if: needs.build.outputs.should_publish == 'true'
+    permissions:
+      contents: write  # Required to create GitHub releases
+    environment:
+      name: ${{ needs.build.outputs.is_prerelease == 'true' && 'prerelease' || 'production' }}
+      url: https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: module-build
+          path: output/${{ env.MODULE_NAME }}
+
+      - name: Validate Module
+        shell: pwsh
+        run: |
+          $ModulePath = Get-ChildItem -Path "output/${{ env.MODULE_NAME }}/*/${{ env.MODULE_NAME }}.psd1" |
+            Sort-Object { [version](Split-Path (Split-Path $_.FullName -Parent) -Leaf) } -Descending |
+            Select-Object -First 1
+
+          Write-Host "Validating: $($ModulePath.FullName)"
+
+          $Manifest = Test-ModuleManifest -Path $ModulePath.FullName -ErrorAction Stop
+
+          Write-Host "Module: $($Manifest.Name)"
+          Write-Host "Version: $($Manifest.Version)"
+          Write-Host "Prerelease: $($Manifest.PrivateData.PSData.Prerelease)"
+
+      - name: Publish to PSGallery
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          $ModulePath = Get-ChildItem -Path "output/${{ env.MODULE_NAME }}" -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+
+          Write-Host "Publishing from: $($ModulePath.FullName)"
+
+          try {
+            Publish-Module -Path $ModulePath.FullName -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery -Verbose -ErrorAction Stop
+            Write-Host "Successfully published ${{ env.MODULE_NAME }} v${{ needs.build.outputs.semver }}"
+          }
+          catch {
+            if ($_.Exception.Message -match 'already available') {
+              Write-Host "Version ${{ needs.build.outputs.semver }} already published to PSGallery - skipping" -ForegroundColor Yellow
+            }
+            else {
+              throw
+            }
+          }
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ env.MODULE_NAME }} ${{ github.ref_name }}
+          body: |
+            ## ${{ env.MODULE_NAME }} ${{ needs.build.outputs.semver }}
+
+            Published to [PowerShell Gallery](https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}/${{ needs.build.outputs.semver }})
+
+            ### Installation
+            ```powershell
+            Install-Module -Name ${{ env.MODULE_NAME }}${{ needs.build.outputs.is_prerelease == 'true' && ' -AllowPrerelease' || '' }}
+            ```
+          draft: false
+          prerelease: ${{ needs.build.outputs.is_prerelease == 'true' }}
+          generate_release_notes: true
