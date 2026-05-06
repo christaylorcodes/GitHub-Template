@@ -1,8 +1,10 @@
 <!--
-  Canonical donate page. A backwards-compatible mirror lives at /DONATE.md
-  (root) for external links pointing at the historic path. Keep both files
-  in sync; the only intentional difference is the image path prefix
-  (docs/media/ here, Media/ at the root).
+  Backwards-compatible mirror of docs/DONATE.md.
+  Kept at the repo root so external links to
+  https://github.com/christaylorcodes/GitHub-Template/blob/main/DONATE.md
+  (used by other christaylorcodes repos) keep working after the docs/ reorg.
+  Image paths point at Media/ (also a mirror of docs/media/).
+  Keep this file in sync with docs/DONATE.md.
 -->
 
 ## Donating
@@ -18,7 +20,7 @@ Donations allow me to spend more time on this project and implement your feature
 
 | BTC                                                                                                          | ETH                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| ![bc1qtfghmwqa6tshkpf03nsjlf40a6vahwg2n4vvqv](media/BTC.png "bc1qtfghmwqa6tshkpf03nsjlf40a6vahwg2n4vvqv") | ![0x4aDC4F156D0A285ac9FB8C9Bd1513fe64FE35F1B](media/ETH.png "0x4aDC4F156D0A285ac9FB8C9Bd1513fe64FE35F1B") |
+| ![bc1qtfghmwqa6tshkpf03nsjlf40a6vahwg2n4vvqv](Media/BTC.png "bc1qtfghmwqa6tshkpf03nsjlf40a6vahwg2n4vvqv") | ![0x4aDC4F156D0A285ac9FB8C9Bd1513fe64FE35F1B](Media/ETH.png "0x4aDC4F156D0A285ac9FB8C9Bd1513fe64FE35F1B") |
 | `bc1qtfghmwqa6tshkpf03nsjlf40a6vahwg2n4vvqv`                                                                 | `0x4aDC4F156D0A285ac9FB8C9Bd1513fe64FE35F1B`                                                                 |
 
 </div>
