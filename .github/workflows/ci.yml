@@ -40,7 +40,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -101,14 +101,14 @@ jobs:
           ./build.ps1 -Tasks build
 
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: module-build
           path: output/${{ env.MODULE_NAME }}
           retention-days: 7
 
       - name: Upload Required Modules
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: required-modules
           path: output/RequiredModules
@@ -128,16 +128,16 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: module-build
           path: output/${{ env.MODULE_NAME }}
 
       - name: Download Required Modules
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: required-modules
           path: output/RequiredModules
@@ -150,7 +150,7 @@ jobs:
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}
           path: output/testResults/
@@ -166,10 +166,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Required Modules
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: required-modules
           path: output/RequiredModules
@@ -217,10 +217,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: module-build
           path: output/${{ env.MODULE_NAME }}
