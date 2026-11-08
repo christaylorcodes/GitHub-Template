@@ -229,14 +229,18 @@ try {
     $result = Get-Something -Id $Id
 }
 catch [System.Net.WebException] {
-    # Typed catch for expected failures
-    Write-Error -Message "Network error retrieving ID $Id : $($_.Exception.Message)" -ErrorRecord $_
-    throw
+    # Typed catch for expected failures: add context, keep the original as InnerException
+    $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+        [System.Exception]::new("Network error retrieving ID $Id", $_.Exception),
+        'GetSomethingNetworkError',
+        [System.Management.Automation.ErrorCategory]::ConnectionError,
+        $Id
+    )
+    $PSCmdlet.ThrowTerminatingError($errorRecord)
 }
 catch {
-    # General catch for unexpected failures
-    Write-Error -Message "Failed to process ID $Id" -ErrorRecord $_
-    throw
+    # General catch for unexpected failures: re-throw attributed to this function
+    $PSCmdlet.ThrowTerminatingError($_)
 }
 ```
 
@@ -247,7 +251,8 @@ catch {
 - **Include context** in error messages: what you were trying to do, which item failed
 - **Re-throw** (`throw` with no arguments) unless you genuinely handle the error
 - **Never use empty catch blocks** (PSSA enforces this)
-- Use `Write-Error` to record the error, then `throw` to propagate it
+- In advanced functions, propagate with `$PSCmdlet.ThrowTerminatingError()` so the error is attributed to the function, not a line inside it
+- **Never** write `Write-Error -Message '...' -ErrorRecord $_`: `-Message` and `-ErrorRecord` are in different parameter sets, so the call fails to bind and hides the real error
 
 ### What NOT To Do
 

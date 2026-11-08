@@ -40,7 +40,10 @@ The CI/CD pipeline will automatically:
 
 1. Create account at [PowerShell Gallery](https://www.powershellgallery.com)
 2. Navigate to Account → API Keys
-3. Create new API key with "Push new packages and package versions" permission
+3. Create a new API key:
+   - Scope: **Push new packages and package versions**
+   - Glob pattern: **your module name only** (not `*`), so a leaked key can't publish other packages
+   - Expiration: set one (e.g. 365 days) and add a calendar reminder to rotate it
 4. **Save the key securely** - you can't view it again!
 
 ### GitHub Repository Setup
@@ -54,22 +57,30 @@ The CI/CD pipeline will automatically:
 
 ## Initial Setup
 
-### Step 1: Configure GitHub Secret
+### Step 1: Create Protected Environments and the API Key Secret
 
-Add your PSGallery API key to GitHub:
+The publish job runs in a GitHub **environment**: `production` for stable tags and
+`prerelease` for `-label` tags. Store the API key on those environments, **not** as a
+repository secret. A repository secret is readable by every workflow on every branch;
+an environment secret is only released to jobs that pass the environment's rules.
 
-**Repository Level (Simple):**
-1. Go to: `https://github.com/username/repo/settings/secrets/actions`
-2. Click "New repository secret"
-3. Name: `PSGALLERY_API_KEY`
-4. Value: Your API key from PowerShell Gallery
-5. Click "Add secret"
+1. Go to **Settings → Environments** and create both `production` and `prerelease`
+   **before your first tag**. If they don't exist, GitHub creates them on first use
+   with no protection rules.
+2. On each environment:
+   - **Deployment branches and tags**: *Selected branches and tags* → add the tag
+     pattern `v*`
+   - Add an **environment secret** named `PSGALLERY_API_KEY` with your API key
+3. On `production`, add **Required reviewers** (yourself is fine). Every stable publish
+   then waits for a click, which is the real safeguard against an accidental release.
+4. Go to **Settings → Rules → Rulesets** and add a **tag ruleset** for `v*` that
+   restricts creation, update and deletion to maintainers.
 
-**Organization Level (Reusable - requires GitHub organization):**
-1. Convert personal account to organization if needed
-2. Go to: `https://github.com/organizations/orgname/settings/secrets/actions`
-3. Add `PSGALLERY_API_KEY` once
-4. All repos automatically inherit it
+> The workflow also checks that a stable tag points at a commit on `main` (and a
+> prerelease tag at `main` or `prerelease`). That check catches mistakes, not
+> attacks: a tag push runs the workflow file from the tagged commit, so someone who
+> can push tags can edit the check. The environment and ruleset settings above are
+> the security controls.
 
 ### Step 2: Update Module Manifest
 
@@ -314,10 +325,17 @@ The module 'ModuleName' with version '1.0.0' cannot be published as the
 current version '1.0.0' is already available in the repository
 ```
 
-**Solution:**
-The improved workflow now handles this gracefully. It will skip re-publishing but still create the GitHub release.
+**Behavior:**
+Before publishing, the workflow checks whether the exact version already exists on
+PSGallery:
 
-If you need to fix and re-release:
+- **First run attempt:** the job **fails**. Two tags produced the same version (for
+  example a typo, or two prerelease tags that differ only after the label).
+- **Re-run of a failed job** (`github.run_attempt > 1`): the publish is skipped and the
+  GitHub release is still created. This covers a run that published successfully but
+  failed afterwards.
+
+PSGallery never allows replacing a published version. To fix and re-release:
 1. Increment version to `1.0.1`
 2. Tag as `v1.0.1`
 
@@ -451,10 +469,15 @@ Based on real-world PowerShell Gallery publishing experience:
 - GitHub Actions needs explicit `contents: write` for releases
 - Don't assume default GITHUB_TOKEN has all permissions
 
-### 6. Handle Re-Publishing Gracefully
-- Already-published versions shouldn't fail pipeline
-- Allow re-running builds without errors
-- Still create GitHub release even if PSGallery publish skipped
+### 6. Handle Re-Publishing Deliberately
+- A duplicate version on the first attempt is a mistake and fails the pipeline
+- Re-running a failed job skips the already-published version and finishes the release
+- The built version must exactly equal the tag (`v1.2.0-beta1` → `1.2.0` + `beta1`), or the build fails
+
+### 7. Never Interpolate Tag Values Into Scripts
+- `${{ github.ref_name }}` and outputs derived from it are attacker-controllable text
+- Pass them to `run:` scripts through `env:` and read `$env:NAME`
+- Tags must match `vX.Y.Z` or `vX.Y.Z-label` (alphanumeric label); anything else fails
 
 ## Migration Guide
 

@@ -44,12 +44,24 @@ Use this as a pass/fail checklist when reviewing code for merge or release.
 Functions should record context then re-throw, not swallow errors:
 
 ```powershell
-# CORRECT: Record context, re-throw
+# CORRECT: Add context, keep the original exception, re-throw
 try {
     $response = Invoke-RestMethod -Uri $uri -Headers $headers
 }
 catch [System.Net.WebException] {
-    Write-Error -Message "API call to $uri failed: $($_.Exception.Message)" -ErrorRecord $_
+    $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+        [System.Exception]::new("API call to $uri failed", $_.Exception),
+        'ApiCallFailed',
+        [System.Management.Automation.ErrorCategory]::ConnectionError,
+        $uri
+    )
+    $PSCmdlet.ThrowTerminatingError($errorRecord)
+}
+
+# WRONG: Fails to bind. -Message and -ErrorRecord are in different
+# parameter sets, so this throws a ParameterBindingException instead
+catch {
+    Write-Error -Message "API call failed" -ErrorRecord $_
     throw
 }
 
@@ -96,10 +108,12 @@ function Get-Data {
 
 # CORRECT in a module function
 function Get-Data {
+    [CmdletBinding()]
+    param()
+
     try { ... }
     catch {
-        Write-Error -Message "Failed to get data" -ErrorRecord $_
-        throw
+        $PSCmdlet.ThrowTerminatingError($_)
     }
 }
 

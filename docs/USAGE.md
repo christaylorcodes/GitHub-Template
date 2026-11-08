@@ -197,7 +197,7 @@ Get-Something -Name "Example" -Debug
 ```
 
 ## Contributing
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on contributing to this project.
+See [CONTRIBUTING.md](../.github/CONTRIBUTING.md) for guidelines on contributing to this project.
 
 ## License
 See [LICENSE](../LICENSE) for license information.

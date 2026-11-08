@@ -1,4 +1,4 @@
-#requires -Version 7.2
+﻿#requires -Version 7.2
 
 <#
 .SYNOPSIS
@@ -9,8 +9,13 @@
     Import this module in every test file instead of duplicating path-navigation logic.
 
     Supports two modes:
-    - Built module: imports from output/ (when running via ./build.ps1 -Tasks test)
-    - Source module: imports from source/ (when running via Invoke-QuickTest.ps1)
+    - Built module: imports from output/ when a build exists (./build.ps1 -Tasks test)
+    - Source module: imports from source/ when no build exists, or when
+      $env:MODULE_TEST_SOURCE = '1' (set by Invoke-QuickTest.ps1 so quick tests
+      never run against a stale build)
+
+    Initialize-TestModule prints which mode is in use unless
+    $env:MODULE_TEST_QUIET = '1'.
 
 .EXAMPLE
     # In a test file's BeforeAll block:
@@ -43,7 +48,7 @@ $script:BuiltModuleManifest = Get-ChildItem -Path $builtModulePattern -ErrorActi
     Sort-Object { [version](Split-Path (Split-Path $_.FullName -Parent) -Leaf) } -Descending |
     Select-Object -First 1
 
-$script:UseBuiltModule = $null -ne $script:BuiltModuleManifest
+$script:UseBuiltModule = ($null -ne $script:BuiltModuleManifest) -and ($env:MODULE_TEST_SOURCE -ne '1')
 
 function Get-ProjectRoot {
     <#
@@ -99,6 +104,11 @@ function Initialize-TestModule {
     # Remove if already loaded
     if (Get-Module -Name $script:ModuleName) {
         Remove-Module -Name $script:ModuleName -Force
+    }
+
+    if ($env:MODULE_TEST_QUIET -ne '1') {
+        $mode = if ($script:UseBuiltModule) { 'BUILT' } else { 'SOURCE' }
+        Write-Host "[TestHelper] Testing $mode module: $manifestPath" -ForegroundColor DarkGray
     }
 
     # Import globally so the module is available in the caller's scope (not just TestHelper's)

@@ -4,6 +4,9 @@
 # Checks:
 #   - CHANGELOG.md has been updated
 #   - Warns if version hasn't been bumped (informational only)
+#
+# Security note: never interpolate ${{ github.* }} values directly into a
+# run: script. Pass them through env: instead.
 
 name: PR Validation
 
@@ -13,6 +16,9 @@ on:
       - main
       - master
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
 
 env:
   MODULE_NAME: ModuleName
@@ -27,11 +33,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check CHANGELOG Updated
         shell: pwsh
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          $ChangedFiles = git diff --name-only origin/${{ github.base_ref }}...HEAD
+          $ChangedFiles = git diff --name-only "origin/$env:BASE_REF...HEAD"
 
           if ($ChangedFiles -notcontains 'CHANGELOG.md') {
               Write-Host "::warning::CHANGELOG.md has not been updated in this PR"
@@ -46,7 +55,7 @@ jobs:
           if (Test-Path 'CHANGELOG.md') {
               $Changelog = Get-Content -Path 'CHANGELOG.md' -Raw
 
-              # Check for Unreleased section
+              # Sampler's release task needs an [Unreleased] section
               if ($Changelog -notmatch '\[Unreleased\]') {
                   Write-Host "::warning::CHANGELOG.md should have an [Unreleased] section for pending changes"
               }
@@ -61,41 +70,41 @@ jobs:
 
       - name: Check Version (Informational)
         shell: pwsh
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          # Get current version from PR branch
-          $ManifestPath = Get-ChildItem -Path "source/*.psd1" | Select-Object -First 1
+          $ManifestPath = Get-ChildItem -Path 'source/*.psd1' | Select-Object -First 1
           if (-not $ManifestPath) {
               Write-Host "::warning::No module manifest found in source/"
               exit 0
           }
 
-          $PRManifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
-          $PRVersion = [version]$PRManifest.ModuleVersion
+          $RelativePath = 'source/' + $ManifestPath.Name
+          $PRVersion = [version](Import-PowerShellDataFile -Path $ManifestPath.FullName).ModuleVersion
 
-          # Get version from base branch
-          git fetch origin ${{ github.base_ref }} --quiet
-          git checkout origin/${{ github.base_ref }} -- $ManifestPath.FullName 2>$null
-
-          if (Test-Path $ManifestPath.FullName) {
-              $BaseManifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
-              $BaseVersion = [version]$BaseManifest.ModuleVersion
-
-              # Restore PR version
-              git checkout HEAD -- $ManifestPath.FullName
-
-              Write-Host "Base version: $BaseVersion"
-              Write-Host "PR version: $PRVersion"
-
-              if ($PRVersion -le $BaseVersion) {
-                  Write-Host "::notice::Version in manifest has not been bumped"
-                  Write-Host "This is OK - version will be set from git tag during release"
-              } else {
-                  Write-Host "Version bump detected: $BaseVersion -> $PRVersion"
-              }
-          } else {
-              # Restore PR version
-              git checkout HEAD -- $ManifestPath.FullName
+          # Read the base branch manifest without touching the working tree
+          $BaseContent = git show "origin/$($env:BASE_REF):$RelativePath" 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $BaseContent) {
               Write-Host "New module - version is $PRVersion"
+              exit 0
+          }
+
+          $TempFile = New-TemporaryFile
+          try {
+              $BaseContent | Set-Content -Path $TempFile.FullName
+              $BaseVersion = [version](Import-PowerShellDataFile -Path $TempFile.FullName).ModuleVersion
+          } finally {
+              Remove-Item $TempFile.FullName -Force -ErrorAction SilentlyContinue
+          }
+
+          Write-Host "Base version: $BaseVersion"
+          Write-Host "PR version: $PRVersion"
+
+          if ($PRVersion -le $BaseVersion) {
+              Write-Host "::notice::Version in manifest has not been bumped"
+              Write-Host "This is OK - version will be set from git tag during release"
+          } else {
+              Write-Host "Version bump detected: $BaseVersion -> $PRVersion"
           }
 
       - name: Summary

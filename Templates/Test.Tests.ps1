@@ -1,4 +1,4 @@
-BeforeAll {
+﻿BeforeAll {
     # Find and import TestHelper (works at any directory depth under Tests/)
     $testDir = $PSScriptRoot
     while ($testDir -and !(Test-Path (Join-Path $testDir 'TestHelpers/TestHelper.psm1'))) {
@@ -73,14 +73,13 @@ Describe 'Verb-Noun' -Tag 'Unit', 'Public' {
             { Verb-Noun -ParameterName '' } | Should -Throw
         }
 
-        It 'Should write error messages for failed operations' {
-            Mock Write-Error -ModuleName $script:Module.Name
+        It 'Should surface failures from its dependencies as terminating errors' {
+            # Mock a command the function calls so it fails. -ModuleName is required
+            # so the mock replaces the command inside the module's scope.
+            Mock Get-Date -ModuleName $script:Module.Name { throw 'dependency failed' }
 
-            # Trigger the error condition in the function
-            # Verb-Noun -ParameterName 'bad-input'
-
-            # Verify error was logged
-            # Should -Invoke Write-Error -ModuleName $script:Module.Name -Times 1
+            { Verb-Noun -ParameterName 'Value' } | Should -Throw '*dependency failed*'
+            Should -Invoke Get-Date -ModuleName $script:Module.Name -Times 1 -Exactly
         }
     }
 

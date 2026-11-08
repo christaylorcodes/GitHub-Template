@@ -1,4 +1,4 @@
-@{
+﻿@{
     # Script module or binary module file associated with this manifest.
     RootModule        = 'ModuleName.psm1'
 
@@ -58,6 +58,10 @@
 
             # A URL to an icon representing this module.
             IconUri      = 'https://raw.githubusercontent.com/YOUR-USERNAME/ModuleName/main/docs/media/Logo.png'
+
+            # Prerelease label. Leave empty: CI sets it from the git tag (v1.2.0-beta1 -> 'beta1').
+            # ModuleBuilder only writes the label when this key exists, so do not remove it.
+            Prerelease   = ''
 
             # ReleaseNotes of this module
             ReleaseNotes = @'

@@ -89,7 +89,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://guides.github.com
 
 ## AI Contributors
 
-This project welcomes contributions from AI coding agents. AI agents follow the same quality standards as human contributors. See [AGENTS.md](AGENTS.md) for complete instructions, conventions, and the issue-driven workflow.
+This project welcomes contributions from AI coding agents. AI agents follow the same quality standards as human contributors. See [AGENTS.md](../AGENTS.md) for complete instructions, conventions, and the issue-driven workflow.
 
 ## Styleguides
 

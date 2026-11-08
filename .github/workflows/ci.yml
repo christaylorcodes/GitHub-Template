@@ -2,10 +2,15 @@
 # Uses Sampler/ModuleBuilder build system
 #
 # Branch Strategy:
-#   - prerelease: Active development, tag v*.*.*-label to publish prerelease
-#   - main: Stable releases only, tag v*.*.* to publish stable
+#   - prerelease: Active development, tag vX.Y.Z-label to publish prerelease
+#   - main: Stable releases only, tag vX.Y.Z to publish stable
 #
-# Version is extracted from git tag - no need to update manifest manually
+# Version is extracted from git tag - no need to update manifest manually.
+# Tag format is strict: vX.Y.Z or vX.Y.Z-label (label is alphanumeric only,
+# e.g. v1.2.0-beta1, v1.2.0-rc2). Anything else fails the build.
+#
+# Security note: never interpolate ${{ github.* }} / ${{ needs.* }} values
+# directly into a run: script. Pass them through env: instead.
 
 name: CI/CD Pipeline
 
@@ -15,12 +20,20 @@ on:
       - main
       - master
       - prerelease
+      - 'fix/**'
+      - 'chore/**'
+      - 'docs/**'
+      - 'feature/**'
     tags:
       - 'v*.*.*'
   pull_request:
     branches:
       - main
       - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   MODULE_NAME: ModuleName
@@ -43,30 +56,30 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Calculate Version
         id: version
         shell: pwsh
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $IsTag = '${{ github.ref_type }}' -eq 'tag'
-          $TagName = '${{ github.ref_name }}'
-
-          if ($IsTag -and $TagName -match '^v(\d+\.\d+\.\d+.*)$') {
-              # Extract version from tag (v3.1.0-beta1 -> 3.1.0-beta1)
-              $SemVer = $Matches[1]
-              $ShouldPublish = 'true'
-
-              # Check if prerelease (has suffix like -beta1, -rc1, -alpha1)
-              if ($SemVer -match '^(\d+\.\d+\.\d+)-(.+)$') {
-                  $Version = $Matches[1]
-                  $IsPrerelease = 'true'
-              } else {
-                  $Version = $SemVer
-                  $IsPrerelease = 'false'
+          if ($env:REF_TYPE -eq 'tag') {
+              # Strict: vX.Y.Z or vX.Y.Z-label (alphanumeric label only).
+              # PSGallery rejects dotted prerelease labels and Sampler truncates
+              # labels at a second dash, so both are refused here.
+              if ($env:REF_NAME -notmatch '^v(\d+\.\d+\.\d+)(?:-([0-9A-Za-z]+))?$') {
+                  throw "Tag '$env:REF_NAME' is not a valid release tag. Use vX.Y.Z or vX.Y.Z-label (e.g. v1.2.0-beta1)."
               }
+              $Version = $Matches[1]
+              $Label = $Matches[2]
+              $SemVer = if ($Label) { "$Version-$Label" } else { $Version }
+              $IsPrerelease = if ($Label) { 'true' } else { 'false' }
+              $ShouldPublish = 'true'
           } else {
               # Not a tag - use manifest version for build only
-              $ManifestPath = Get-ChildItem -Path "source/*.psd1" | Select-Object -First 1
+              $ManifestPath = Get-ChildItem -Path 'source/*.psd1' | Select-Object -First 1
               if ($ManifestPath) {
                   $Manifest = Import-PowerShellDataFile -Path $ManifestPath.FullName
                   $Version = $Manifest.ModuleVersion
@@ -88,6 +101,36 @@ jobs:
           "is_prerelease=$IsPrerelease" >> $env:GITHUB_OUTPUT
           "should_publish=$ShouldPublish" >> $env:GITHUB_OUTPUT
 
+      # Guards against tagging the wrong commit by mistake. This is NOT a
+      # security control: a tag push runs the workflow file from the tagged
+      # commit, so anyone who can push tags can also edit this check. Use a
+      # tag ruleset and environment protection (see docs/PUBLISHING.md).
+      - name: Verify Tag Branch
+        if: steps.version.outputs.should_publish == 'true'
+        shell: pwsh
+        env:
+          IS_PRERELEASE: ${{ steps.version.outputs.is_prerelease }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          function Test-OnBranch([string]$Branch) {
+              git rev-parse --verify --quiet "refs/remotes/origin/$Branch" *> $null
+              if ($LASTEXITCODE -ne 0) { return $false }
+              git merge-base --is-ancestor HEAD "origin/$Branch"
+              switch ($LASTEXITCODE) {
+                  0 { return $true }
+                  1 { return $false }
+                  default { throw "git merge-base failed (exit $LASTEXITCODE) checking origin/$Branch. Is the checkout shallow?" }
+              }
+          }
+
+          $Allowed = if ($env:IS_PRERELEASE -eq 'true') { @('main', 'master', 'prerelease') } else { @('main', 'master') }
+          $OnBranch = $Allowed | Where-Object { Test-OnBranch $_ } | Select-Object -First 1
+
+          if (-not $OnBranch) {
+              throw "Tag '$env:REF_NAME' points at a commit that is not on any of: $($Allowed -join ', '). Refusing to publish."
+          }
+          Write-Host "Tag '$env:REF_NAME' is on branch '$OnBranch'"
+
       - name: Resolve Dependencies
         shell: pwsh
         run: |
@@ -99,6 +142,27 @@ jobs:
           ModuleVersion: ${{ steps.version.outputs.semver }}
         run: |
           ./build.ps1 -Tasks build
+
+      - name: Verify Built Version Matches Tag
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_SEMVER: ${{ steps.version.outputs.semver }}
+        run: |
+          $Manifest = Get-ChildItem -Path "output/$env:MODULE_NAME/*/$env:MODULE_NAME.psd1" | Select-Object -First 1
+          if (-not $Manifest) { throw "Built manifest not found under output/$env:MODULE_NAME" }
+
+          $Data = Import-PowerShellDataFile -Path $Manifest.FullName
+          $Prerelease = "$($Data.PrivateData.PSData.Prerelease)"
+          $Built = if ($Prerelease) { "$($Data.ModuleVersion)-$Prerelease" } else { "$($Data.ModuleVersion)" }
+
+          Write-Host "Expected: $env:EXPECTED_SEMVER"
+          Write-Host "Built:    $Built"
+
+          if ($Built -ne $env:EXPECTED_SEMVER) {
+              throw "Built module version '$Built' does not match expected '$env:EXPECTED_SEMVER'. " +
+                  'If a prerelease suffix is missing, ensure PSData contains a Prerelease key in the source manifest.'
+          }
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -129,6 +193,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
@@ -167,6 +233,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download Required Modules
         uses: actions/download-artifact@v4
@@ -181,15 +249,14 @@ jobs:
           Import-Module PSScriptAnalyzer
 
           $SettingsFile = '.PSScriptAnalyzerSettings.psd1'
-          $AnalyzerParams = @{
-              Path    = 'source'
-              Recurse = $true
-          }
+          # Analyze .ps1/.psm1 only; .psd1 excluded due to PSScriptAnalyzer NullRef bug
+          $Files = Get-ChildItem -Path source -Include '*.ps1','*.psm1' -Recurse -File
+          $AnalyzerParams = @{}
           if (Test-Path $SettingsFile) {
               $AnalyzerParams.Settings = $SettingsFile
           }
 
-          $Results = Invoke-ScriptAnalyzer @AnalyzerParams
+          $Results = $Files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName @AnalyzerParams }
 
           if ($Results) {
               $Results | Format-Table -AutoSize
@@ -211,6 +278,11 @@ jobs:
     if: needs.build.outputs.should_publish == 'true'
     permissions:
       contents: write  # Required to create GitHub releases
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
+    # Store PSGALLERY_API_KEY as an *environment* secret on both environments
+    # and require reviewers on 'production'. See docs/PUBLISHING.md.
     environment:
       name: ${{ needs.build.outputs.is_prerelease == 'true' && 'prerelease' || 'production' }}
       url: https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}
@@ -218,6 +290,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
@@ -227,42 +301,57 @@ jobs:
 
       - name: Validate Module
         shell: pwsh
+        env:
+          EXPECTED_SEMVER: ${{ needs.build.outputs.semver }}
         run: |
-          $ModulePath = Get-ChildItem -Path "output/${{ env.MODULE_NAME }}/*/${{ env.MODULE_NAME }}.psd1" |
-            Sort-Object { [version](Split-Path (Split-Path $_.FullName -Parent) -Leaf) } -Descending |
-            Select-Object -First 1
+          $ModuleDir = Get-ChildItem -Path "output/$env:MODULE_NAME" -Directory |
+              Sort-Object { [version]$_.Name } -Descending |
+              Select-Object -First 1
+          $ManifestPath = Join-Path $ModuleDir.FullName "$env:MODULE_NAME.psd1"
 
-          Write-Host "Validating: $($ModulePath.FullName)"
+          Write-Host "Validating: $ManifestPath"
+          $Manifest = Test-ModuleManifest -Path $ManifestPath -ErrorAction Stop
 
-          $Manifest = Test-ModuleManifest -Path $ModulePath.FullName -ErrorAction Stop
+          $Prerelease = "$($Manifest.PrivateData.PSData.Prerelease)"
+          $Built = if ($Prerelease) { "$($Manifest.Version)-$Prerelease" } else { "$($Manifest.Version)" }
 
           Write-Host "Module: $($Manifest.Name)"
-          Write-Host "Version: $($Manifest.Version)"
-          Write-Host "Prerelease: $($Manifest.PrivateData.PSData.Prerelease)"
+          Write-Host "Version: $Built"
+
+          if ($Built -ne $env:EXPECTED_SEMVER) {
+              throw "Artifact version '$Built' does not match tag version '$env:EXPECTED_SEMVER'"
+          }
 
       - name: Publish to PSGallery
         shell: pwsh
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+          SEMVER: ${{ needs.build.outputs.semver }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          $ModulePath = Get-ChildItem -Path "output/${{ env.MODULE_NAME }}" -Directory |
-            Sort-Object { [version]$_.Name } -Descending |
-            Select-Object -First 1
-
-          Write-Host "Publishing from: $($ModulePath.FullName)"
-
-          try {
-            Publish-Module -Path $ModulePath.FullName -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery -Verbose -ErrorAction Stop
-            Write-Host "Successfully published ${{ env.MODULE_NAME }} v${{ needs.build.outputs.semver }}"
+          if (-not $env:PSGALLERY_API_KEY) {
+              throw 'PSGALLERY_API_KEY secret is not set for this environment.'
           }
-          catch {
-            if ($_.Exception.Message -match 'already available') {
-              Write-Host "Version ${{ needs.build.outputs.semver }} already published to PSGallery - skipping" -ForegroundColor Yellow
-            }
-            else {
-              throw
-            }
+
+          $ModuleDir = Get-ChildItem -Path "output/$env:MODULE_NAME" -Directory |
+              Sort-Object { [version]$_.Name } -Descending |
+              Select-Object -First 1
+
+          # Refuse to silently skip a duplicate version on the first attempt:
+          # a duplicate there means two tags built the same version.
+          $Existing = Find-PSResource -Name $env:MODULE_NAME -Version $env:SEMVER -Prerelease `
+              -Repository PSGallery -ErrorAction SilentlyContinue
+          if ($Existing) {
+              if ([int]$env:RUN_ATTEMPT -gt 1) {
+                  Write-Host "Version $env:SEMVER already on PSGallery (re-run attempt $env:RUN_ATTEMPT) - skipping publish" -ForegroundColor Yellow
+                  exit 0
+              }
+              throw "Version $env:SEMVER of $env:MODULE_NAME is already published to PSGallery."
           }
+
+          Write-Host "Publishing from: $($ModuleDir.FullName)"
+          Publish-PSResource -Path $ModuleDir.FullName -ApiKey $env:PSGALLERY_API_KEY -Repository PSGallery -ErrorAction Stop
+          Write-Host "Successfully published $env:MODULE_NAME v$env:SEMVER"
 
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
@@ -276,7 +365,7 @@ jobs:
 
             ### Installation
             ```powershell
-            Install-Module -Name ${{ env.MODULE_NAME }}${{ needs.build.outputs.is_prerelease == 'true' && ' -AllowPrerelease' || '' }}
+            Install-PSResource -Name ${{ env.MODULE_NAME }}${{ needs.build.outputs.is_prerelease == 'true' && ' -Prerelease' || '' }}
             ```
           draft: false
           prerelease: ${{ needs.build.outputs.is_prerelease == 'true' }}

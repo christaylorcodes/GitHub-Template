@@ -1,4 +1,4 @@
-function Get-ModuleInfo {
+﻿function Get-ModuleInfo {
     <#
     .SYNOPSIS
     Gets information about the ModuleName module
@@ -70,8 +70,8 @@ function Get-ModuleInfo {
 
             return $ModuleInfo
         } catch {
-            Write-Error -Message "Failed to get module information" -ErrorRecord $_
-            throw
+            # Re-throw as a terminating error attributed to this function
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 
