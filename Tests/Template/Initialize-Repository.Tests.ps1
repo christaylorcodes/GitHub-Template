@@ -24,11 +24,28 @@ Describe 'Initialize-Repository.ps1' -Tag 'Template' -Skip:([bool]$script:SkipRe
         $script:Work = Join-Path $TestDrive 'repo'
         $null = New-Item -ItemType Directory -Path $script:Work
 
-        # Copy the template without git metadata or build output
-        $exclude = @('.git', 'output')
-        Get-ChildItem -LiteralPath $script:TemplateRoot -Force |
-            Where-Object { $_.Name -notin $exclude } |
-            Copy-Item -Destination $script:Work -Recurse -Force
+        # Copy only what a fresh clone would contain (tracked + new, non-ignored files),
+        # so local runs see the same layout as CI (e.g. no empty source/Private folder).
+        $gitFiles = $null
+        if (Test-Path (Join-Path $script:TemplateRoot '.git')) {
+            $gitFiles = git -C $script:TemplateRoot ls-files --cached --others --exclude-standard 2>$null
+            if ($LASTEXITCODE -ne 0) { $gitFiles = $null }
+        }
+
+        if ($gitFiles) {
+            foreach ($relative in $gitFiles) {
+                $sourceFile = Join-Path $script:TemplateRoot $relative
+                if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }  # deleted in working tree
+                $destination = Join-Path $script:Work $relative
+                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force
+                Copy-Item -LiteralPath $sourceFile -Destination $destination
+            }
+        }
+        else {
+            Get-ChildItem -LiteralPath $script:TemplateRoot -Force |
+                Where-Object { $_.Name -notin @('.git', 'output') } |
+                Copy-Item -Destination $script:Work -Recurse -Force
+        }
 
         $script:ModuleName = 'My.Module'
         $script:Author = "O'Brien"

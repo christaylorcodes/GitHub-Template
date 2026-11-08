@@ -54,6 +54,8 @@ function Set-ModuleNameToken([string]$Content, [string]$Name) {
         [System.Text.RegularExpressions.MatchEvaluator] { param($m) $Name })
 }
 
+$ErrorActionPreference = 'Stop'
+
 # Get project root
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $TemplatesPath = Join-Path $ProjectRoot 'Templates'
@@ -88,8 +90,11 @@ if ($Verb -notin $ApprovedVerbs) {
     }
 }
 
-# Determine paths
+# Determine paths (Public/Private may not exist yet: git does not track empty folders)
 $FunctionPath = Join-Path $SourcePath $Type
+if (-not (Test-Path $FunctionPath)) {
+    $null = New-Item -Path $FunctionPath -ItemType Directory -Force
+}
 $FunctionFile = Join-Path $FunctionPath "$FunctionName.ps1"
 
 # Check if function already exists
