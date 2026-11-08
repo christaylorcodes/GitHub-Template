@@ -23,8 +23,10 @@
     # Description of the functionality provided by this module
     Description       = 'Brief description of what this module does'
 
-    # Minimum version of the PowerShell engine required by this module
-    PowerShellVersion = '7.2'
+    # Minimum version of the PowerShell engine required by this module.
+    # 7.6 is the only supported release after 2026-11-10 (7.4 LTS and 7.5 end of support).
+    # Lower it to '7.4' if your users run hosts that lag behind (e.g. some cloud runtimes).
+    PowerShellVersion = '7.6'
 
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules   = @()

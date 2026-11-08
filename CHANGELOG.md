@@ -41,6 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PowerShell 7.6 minimum** (manifest, scripts, docs). 7.4 LTS and 7.5 reach end of support on
+  2026-11-10; 7.6 LTS is supported until 2028-11-14. Lower `PowerShellVersion` to `'7.4'` if your
+  users' hosts lag behind
+- **Pester 6** (`[6.2.0,7.0.0)`), Sampler `[0.120.1,0.121.0)`, ModuleBuilder `[3.2.18,4.0.0)`,
+  platyPS `[0.14.2,1.0.0)`; low-risk tooling (InvokeBuild, PSScriptAnalyzer 1.25.0, ...) floats on `latest`
+- Dependencies resolve with **PSResourceGet** 1.2.0 instead of PowerShellGet v2
+- New `Assert_RequiredModule_Versions` build task fails the build if a dependency is missing, has
+  multiple versions, or is outside its range, and pre-loads the pinned Pester (previously a failed
+  download only warned and the build ran on the runner's built-in Pester)
+- GitHub Actions upgraded and SHA-pinned: checkout v7.0.1, upload-artifact v7.0.2,
+  download-artifact v8.0.2, action-gh-release v3.0.4 (Node 20 retirement)
+- Added `.github/dependabot.yml` (weekly, grouped, 7-day cooldown) for Actions updates
+- PSScriptAnalyzer `PSUseCompatibleSyntax` targets 7.6 (the rule only compares major versions)
 - Publishing uses `Publish-PSResource` (PSResourceGet); the unused `publish` build workflow was removed
 
 ## [1.1.0] - 2026-02-01

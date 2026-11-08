@@ -21,6 +21,7 @@ BuildWorkflow:
 
   build:
     - Clean
+    - Assert_RequiredModule_Versions
     - Build_ModuleOutput_ModuleBuilder
     - Create_changelog_release_output
 
@@ -29,6 +30,7 @@ BuildWorkflow:
     - package_module_nupkg
 
   test:
+    - Assert_RequiredModule_Versions
     - Pester_Tests_Stop_On_Fail
 
   docs:

@@ -1,4 +1,4 @@
-﻿#requires -Version 7.2
+﻿#requires -Version 7.6
 
 <#
     Guards the template's own initialization tooling end to end.

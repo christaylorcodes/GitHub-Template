@@ -20,7 +20,7 @@ This guide will walk you through using this template to create a professional, w
 Before you begin, ensure you have:
 
 - [x] **Git installed** (version 2.0 or higher)
-- [x] **PowerShell 5.1 or higher** (for automation scripts)
+- [x] **PowerShell 7.6 or higher** (build, tests and helper scripts)
 - [x] **GitHub account**
 - [x] **Text editor** (VS Code, Sublime, Notepad++, etc.)
 - [x] (Optional) **GitHub CLI (`gh`)** for repository creation
