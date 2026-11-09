@@ -23,7 +23,7 @@ Ask the user for ALL of the following before running the script.
 | 4 | **GitHub username** (e.g., `janesmith`) | Yes | -- | All GitHub URLs, badge URLs |
 | 5 | **Company name** | No | Author name | Manifest CompanyName |
 | 6 | **Repository name** | No | Module name | GitHub URLs (when repo name differs) |
-| 7 | **Remove donation content?** | No | Yes (remove) | Whether to keep PayPal/crypto donation pages |
+| 7 | **Remove donation content?** | No | No (keep) | Pass `-SkipDonation` to remove the PayPal/crypto donation pages |
 | 8 | **Re-initialize git?** | No | No | Only needed if using clone method |
 
 ### Run the Script
@@ -41,7 +41,7 @@ Ask the user for ALL of the following before running the script.
     -InitializeGit
 ```
 
-Use `-WhatIf` first to preview all changes without applying them.
+Include `-SkipDonation` only if the user chose to remove donation content. Use `-WhatIf` first to preview all changes without applying them.
 
 ---
 
@@ -110,8 +110,8 @@ Edit `source/<ModuleName>.psd1`:
 
 - Add any required modules to `RequiredModules`
 - Update `Tags` for PSGallery discovery
-- Update `ReleaseNotes` for the current version
-- Set `FunctionsToExport` if you want an explicit list instead of wildcard
+- Do not edit `ReleaseNotes` or `ModuleVersion`: release notes come from the `[Unreleased]` section of `CHANGELOG.md`, and the version comes from the git tag
+- Leave `FunctionsToExport` alone: the build sets it from the files in `source/Public/`
 
 ### Wire Up Dependencies
 
@@ -129,7 +129,8 @@ If the existing module depends on other modules:
 
 ```powershell
 # These should all return no results after setup
-git grep -i "ModuleName"
+# (the ModuleName pattern skips legitimate -ModuleName parameters and $ModuleName variables)
+git grep -nE '(^|[^-$:A-Za-z0-9])ModuleName([^A-Za-z0-9]|$)'
 git grep "YOUR-USERNAME"
 git grep "YOUR-REPO"
 git grep "YOUR-PROJECT"
@@ -153,9 +154,12 @@ Remove-Module "<ModuleName>" -Force
 
 ```powershell
 # Bootstrap build dependencies (first time)
-./build.ps1 -ResolveDependency -Tasks build
+./build.ps1 -ResolveDependency -Tasks noop
 
-# Run full pipeline (Clean -> Analyze -> Test -> Build)
+# Run full local pipeline:
+#   build   (Clean -> dependency version check -> Build -> release notes)
+#   analyze (PSScriptAnalyzer on source/)
+#   test    (Pester)
 ./Tests/test-local.ps1
 ```
 
@@ -169,7 +173,7 @@ After all customization is complete, remind the user about:
 
 1. Replace `docs/media/Logo.png` with their project logo
 2. Replace `docs/media/Demo.gif` with a project demo or screenshot
-3. Set up the `PSGALLERY_API_KEY` repository secret for publishing
+3. Create the `production` and `prerelease` GitHub environments, each with a `PSGALLERY_API_KEY` environment secret, for publishing (see `docs/PUBLISHING.md`)
 4. Run `Scripts/Initialize-Labels.ps1` to create AI workflow labels (optional)
 5. Configure GitHub repository settings (branch protection, topics, discussions)
 

@@ -1,6 +1,6 @@
 # PowerShell Style Guide
 
-This is the authoritative style guide for all PowerShell projects. It applies to both formal modules (built with InvokeBuild) and standalone script collections. All projects should reference this file rather than duplicating conventions.
+This is the authoritative style guide for all PowerShell projects. It applies to both formal modules (built with Sampler/ModuleBuilder, using InvokeBuild as the task runner) and standalone script collections. All projects should reference this file rather than duplicating conventions.
 
 ## Language Targets
 
@@ -136,8 +136,7 @@ $ErrorActionPreference = 'Stop'
 #region [Execution]
 try {
     # Main logic
-}
-catch {
+} catch {
     # Error handling
 }
 finally {
@@ -148,36 +147,40 @@ finally {
 
 ## Comment-Based Help
 
-Required on all exported functions. Use the `before` placement (above the function body, not inside it):
+Required on all exported functions. Place the help block **inside** the function, at the top of the body before `[CmdletBinding()]` (this is what `Templates/Function.ps1` and `Scripts/New-Function.ps1` generate):
 
 ```powershell
-<#
-.SYNOPSIS
-    One line. What it does, not how.
+function Get-BackupStatus {
+    <#
+    .SYNOPSIS
+        One line. What it does, not how.
 
-.DESCRIPTION
-    More detail. When you'd use it, what it connects to, important caveats.
+    .DESCRIPTION
+        More detail. When you'd use it, what it connects to, important caveats.
 
-.PARAMETER Name
-    What it accepts and any constraints.
+    .PARAMETER ComputerName
+        What it accepts and any constraints.
 
-.INPUTS
-    System.String. The .NET type accepted from the pipeline.
+    .INPUTS
+        System.String. The .NET type accepted from the pipeline.
 
-.OUTPUTS
-    PSCustomObject. What the function returns.
+    .OUTPUTS
+        PSCustomObject. What the function returns.
 
-.EXAMPLE
-    Get-BackupStatus -ComputerName 'SERVER01'
+    .EXAMPLE
+        Get-BackupStatus -ComputerName 'SERVER01'
 
-    Returns backup status for SERVER01.
+        Returns backup status for SERVER01.
 
-.NOTES
-    Version:        1.0.0
-    Author:         Your Name
-    Creation Date:  YYYY-MM-DD
-    Purpose/Change: Initial development
-#>
+    .NOTES
+        Version:        1.0.0
+        Author:         Your Name
+        Creation Date:  YYYY-MM-DD
+        Purpose/Change: Initial development
+    #>
+    [CmdletBinding()]
+    param(...)
+}
 ```
 
 For standalone scripts, the help block goes at the top of the file before `[CmdletBinding()]`.
@@ -189,12 +192,10 @@ Private functions: `.SYNOPSIS`, `.PARAMETER`, and one `.EXAMPLE` are sufficient.
 Comment-based help is the **source of truth** for all documentation. The build system uses PlatyPS to generate markdown and MAML XML from it:
 
 ```powershell
-./build.ps1 -Tasks docs  # Fresh markdown from comment-based help
-./build.ps1 -Tasks docs  # Update existing markdown files
-./build.ps1 -Tasks docs  # Build MAML XML from markdown
+./build.ps1 -Tasks docs  # Regenerate markdown help in docs/help/en-US/ from comment-based help
 ```
 
-**Flow:** `.ps1` comment-based help → `Get-Help` → PlatyPS → Markdown (`docs/`) → MAML XML (`en-US/`). Do not manually edit the generated markdown or XML files — update the comment-based help in the source `.ps1` files and regenerate.
+**Flow:** `.ps1` comment-based help → `Get-Help` → PlatyPS → Markdown (`docs/help/en-US/`) → MAML XML (built module's `en-US/` under `output/`). Do not manually edit the generated markdown or XML files — update the comment-based help in the source `.ps1` files and regenerate.
 
 ### Known Parser Pitfall: Dot at Start of Line
 
@@ -227,8 +228,7 @@ $ErrorActionPreference = 'Stop'
 
 try {
     $result = Get-Something -Id $Id
-}
-catch [System.Net.WebException] {
+} catch [System.Net.WebException] {
     # Typed catch for expected failures: add context, keep the original as InnerException
     $errorRecord = [System.Management.Automation.ErrorRecord]::new(
         [System.Exception]::new("Network error retrieving ID $Id", $_.Exception),
@@ -237,8 +237,7 @@ catch [System.Net.WebException] {
         $Id
     )
     $PSCmdlet.ThrowTerminatingError($errorRecord)
-}
-catch {
+} catch {
     # General catch for unexpected failures: re-throw attributed to this function
     $PSCmdlet.ThrowTerminatingError($_)
 }
@@ -391,7 +390,7 @@ Tests are not optional. They are how code proves it works, how regressions get c
 ### Requirements
 
 - **Every exported function must have a matching test file**
-- **Pester 5.6+** with configuration-based invocation
+- **Pester 6** with configuration-based invocation
 - **PSScriptAnalyzer** runs as part of every test cycle (`-IncludeAnalyzer`), zero errors required
 - Test structure per function: `Parameter Validation` > `Functionality` > `Error Handling` > `Edge Cases`
 

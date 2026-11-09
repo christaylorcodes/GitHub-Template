@@ -245,6 +245,9 @@ docs/**           linguist-documentation
 # Vendored code
 vendor/**         linguist-vendored
 third-party/**    linguist-vendored
+# Sampler bootstrap scripts (copied from Sampler, not maintained here)
+/build.ps1               linguist-vendored
+/Resolve-Dependency.ps1  linguist-vendored
 
 # Generated code
 *.generated.*     linguist-generated

@@ -54,7 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   download-artifact v8.0.2, action-gh-release v3.0.4 (Node 20 retirement)
 - Added `.github/dependabot.yml` (weekly, grouped, 7-day cooldown) for Actions updates
 - PSScriptAnalyzer `PSUseCompatibleSyntax` targets 7.6 (the rule only compares major versions)
-- Publishing uses `Publish-PSResource` (PSResourceGet); the unused `publish` build workflow was removed
+- Publishing uses `Publish-PSResource`
+- **Docs refreshed** for the current build: version comes from the tag (no manifest/tag match check),
+  release notes come from CHANGELOG, no `publish` build task, `Install-PSResource`/`Publish-PSResource`,
+  cuddled `} else {` brace style, help inside the function body, ModuleBuilder discards the source
+  `.psm1` body (use prefix/suffix files for init code)
+- `.vscode/settings.json` formatter matches the analyzer brace rules; `output` exclusion casing fixed
+- `.gitignore` secret patterns narrowed (`*secret*` ignored files like `Get-Secret.ps1`); `tags` root-only
+- `build.ps1` and `Resolve-Dependency.ps1` marked `linguist-vendored` (PSResourceGet); the unused `publish` build workflow was removed
 
 ## [1.1.0] - 2026-02-01
 

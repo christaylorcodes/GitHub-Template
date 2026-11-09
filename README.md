@@ -44,7 +44,7 @@ This template gives you everything needed to publish a professional PowerShell m
 | Category | What You Get | Details |
 | -------- | ------------ | ------- |
 | **Build System** | Sampler/ModuleBuilder pipeline with Clean, Build, Test, and Publish tasks | [AGENTS.md — Build System](AGENTS.md#build-system) |
-| **Testing** | Pester 5.6+ with code coverage (JaCoCo) and NUnit results | [AGENTS.md — Test Framework](AGENTS.md#test-framework) |
+| **Testing** | Pester 6 with code coverage (JaCoCo) and NUnit results | [AGENTS.md — Test Framework](AGENTS.md#test-framework) |
 | **Code Quality** | PSScriptAnalyzer with tuned rule set and editor integration | [.PSScriptAnalyzerSettings.psd1](.PSScriptAnalyzerSettings.psd1) |
 | **CI/CD Workflows** | GitHub Actions for testing, analysis, and PSGallery publishing | [AGENTS.md — CI/CD](AGENTS.md#cicd) |
 | **Module Structure** | Auto-discovering `source/` layout with Classes, Private, and Public folders | [AGENTS.md — Architecture](AGENTS.md#architecture) |
@@ -102,7 +102,7 @@ This repository is designed for AI-assisted development from the ground up. Whet
 **For agents working in this repo:**
 
 - [AGENTS.md](AGENTS.md) — Full project context: architecture, build commands, conventions, and workflow
-- [CLAUDE.md](CLAUDE.md) — Claude Code session workflow and planning system
+- [CLAUDE.md](CLAUDE.md) — Points Claude Code to AGENTS.md and lists the mandatory validation commands
 
 **For agents working in other repos that use this template:**
 
@@ -124,14 +124,18 @@ your-module/
   RequiredModules.psd1           # Build dependency specifications
   source/
     ModuleName.psd1              # Module manifest
-    ModuleName.psm1              # Root module (auto-loads subdirectories)
+    ModuleName.psm1              # Dev-time loader (body replaced by the build)
     Classes/                     # PowerShell class definitions
     Private/                     # Internal helper functions
     Public/                      # Exported functions (one per file)
+    en-US/                       # about_ModuleName help topic
   Tests/
+    Unit/Module/                 # Module health tests (import, manifest, exports)
     Unit/Public/                 # Tests for exported functions
     Unit/Private/                # Tests for internal functions
     Integration/                 # Integration tests
+    TestHelpers/                 # Shared test utilities
+    Template/                    # Template-only guard tests (removed by init)
   Templates/                     # Boilerplate for new functions and tests
   Scripts/                       # Automation (init, validate, badges, labels)
   docs/                          # Guides, help files, examples

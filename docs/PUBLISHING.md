@@ -82,13 +82,12 @@ an environment secret is only released to jobs that pass the environment's rules
 > can push tags can edit the check. The environment and ruleset settings above are
 > the security controls.
 
-### Step 2: Update Module Manifest
+### Step 2: Review Module Manifest Metadata
 
-Edit `source/ModuleName.psd1`:
+Edit `source/ModuleName.psd1` once to set the gallery metadata:
 
 ```powershell
 @{
-    ModuleVersion = '1.0.0'
     Author = 'Your Name'
     CompanyName = 'Your Company'
     Description = 'Module description'
@@ -96,26 +95,25 @@ Edit `source/ModuleName.psd1`:
     Tags = @('Keyword1', 'Keyword2')  # For PSGallery search
     ProjectUri = 'https://github.com/username/ModuleName'
     LicenseUri = 'https://github.com/username/ModuleName/blob/main/LICENSE'
-
-    ReleaseNotes = @'
-## Version 1.0.0
-- Initial release
-- Feature 1
-- Feature 2
-'@
 }
 ```
 
+You do **not** edit `ModuleVersion` or `ReleaseNotes` for a release. The version comes
+from the git tag, and the build fills the release notes from `CHANGELOG.md`. The
+`ModuleVersion` in the source manifest is informational only (used for untagged local
+and CI builds).
+
 ### Step 3: Update CHANGELOG.md
+
+Record changes under `[Unreleased]`. The build (Sampler) uses that section as the
+release notes for the published package:
 
 ```markdown
 # Changelog
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-01-21
-
-### Initial Release
+### Added
 - Feature 1
 - Feature 2
 ```
@@ -132,33 +130,31 @@ The `.github/workflows/ci.yml` pipeline handles everything automatically:
 └────────────────┬─────────────────────────────────┘
                  │
     ┌────────────▼──────────────┐
-    │  1. VERSION & VALIDATE    │
+    │  1. BUILD                 │
     │  - Parse version from tag │
     │  - Detect prerelease      │
-    │  - Validate tag matches   │
-    │    module manifest        │
+    │  - Check tag is on the    │
+    │    allowed branch         │
+    │  - Build module (Sampler) │
+    │  - Verify built version   │
+    │    equals the tag         │
+    │  - Upload `module-build`  │
+    │    artifact               │
     └────────────┬──────────────┘
-                 │ (fails fast on mismatch)
+                 │
     ┌────────────▼──────────────┐
-    │  2. BUILD & TEST          │
-    │  - Install dependencies   │
+    │  2. TEST & ANALYZE        │
+    │  - Pester (Ubuntu +       │
+    │    Windows)               │
     │  - PSScriptAnalyzer       │
-    │  - Pester tests           │
-    │  - Build module           │
     └────────────┬──────────────┘
                  │
     ┌────────────▼──────────────┐
     │  3. PUBLISH               │
-    │  - Publish to PSGallery   │
-    │  - Add -Prerelease flag   │
-    │    when tag has suffix    │
-    └────────────┬──────────────┘
-                 │
-    ┌────────────▼──────────────┐
-    │  4. RELEASE               │
-    │  - Extract CHANGELOG      │
+    │  - Publish-PSResource to  │
+    │    PSGallery (prerelease  │
+    │    label from the tag)    │
     │  - Create GitHub Release  │
-    │  - Upload module ZIP      │
     └───────────────────────────┘
 ```
 
@@ -168,23 +164,28 @@ When you push a tag matching `v*.*.*`:
 
 | Step | What it does | On failure |
 | ---- | ------------ | ---------- |
-| Version validation | Compares tag to `ModuleVersion` in manifest | Workflow stops with clear error |
+| Version from tag | Parses `vX.Y.Z` / `vX.Y.Z-label`; the built module must equal the tag | Workflow stops with clear error |
 | Tests & analysis | Runs Pester + PSScriptAnalyzer | Workflow stops, nothing published |
-| PSGallery publish | Publishes module (with `-Prerelease` if tag has suffix) | Workflow stops |
-| GitHub Release | Extracts notes from CHANGELOG.md, creates release, attaches ZIP | Release created with fallback text if CHANGELOG section not found |
+| PSGallery publish | `Publish-PSResource` of the built `module-build` artifact | Workflow stops |
+| GitHub Release | Creates a release with install instructions and GitHub-generated notes | Workflow stops |
+
+The built module folder is uploaded as the `module-build` workflow artifact on every
+run, so you can download it from the run summary. Package release notes on PSGallery
+come from the `[Unreleased]` section of `CHANGELOG.md`.
 
 ### What You Do Manually
 
-1. Update `ModuleVersion` in `source/ModuleName.psd1`
-2. Add a version entry to `CHANGELOG.md`
-3. Run `./Tests/test-local.ps1`
-4. Commit, push, then create and push the tag
+1. Add your changes under `[Unreleased]` in `CHANGELOG.md`
+2. Run `./Tests/test-local.ps1`
+3. Commit, push, then create and push the tag
 
-The tag version **must match** the manifest `ModuleVersion` — the workflow will reject mismatches.
+No manifest edit is needed: the version comes from the tag. The `ModuleVersion` in
+`source/ModuleName.psd1` is informational and is not compared to the tag.
 
 ### Version Detection
 
-The pipeline automatically determines version from git tags:
+The pipeline automatically determines version from git tags. Tags must be `vX.Y.Z` or
+`vX.Y.Z-label` with an alphanumeric label; any other tag fails the build:
 
 - **Stable**: `v1.0.0` → Version 1.0.0, Prerelease = ""
 - **Prerelease**: `v1.0.0-beta1` → Version 1.0.0, Prerelease = "beta1"
@@ -260,23 +261,20 @@ This runs the same checks as CI/CD:
 ### Stable Release (v1.0.0)
 
 ```powershell
-# 1. Update version in source/ModuleName.psd1
-ModuleVersion = '1.0.0'
-
-# 2. Update CHANGELOG.md
-## [1.0.0] - 2026-01-21
+# 1. Update CHANGELOG.md (no manifest edit needed)
+## [Unreleased]
 ### Added
 - New feature X
 
-# 3. Test locally
+# 2. Test locally
 ./Tests/test-local.ps1
 
-# 4. Commit changes
+# 3. Commit changes
 git add .
 git commit -m "Prepare v1.0.0 release"
 git push origin main
 
-# 5. Create and push tag
+# 4. Create and push tag
 git tag -a v1.0.0 -m "Release v1.0.0 - Description"
 git push origin v1.0.0
 ```
@@ -299,7 +297,7 @@ git push origin v1.1.0-beta1
 
 Users install with:
 ```powershell
-Install-Module -Name ModuleName -AllowPrerelease
+Install-PSResource -Name ModuleName -Prerelease
 ```
 
 ### Promoting Prerelease to Stable
@@ -361,18 +359,16 @@ publish:
 
 1. **Brace placement**
    ```powershell
-   # Bad
-   if ($condition) {
-       # code
-   } else {
+   # Bad (open brace on its own line)
+   if ($condition)
+   {
        # code
    }
 
-   # Good
+   # Good (open brace on same line; cuddled } else { is allowed)
    if ($condition) {
        # code
-   }
-   else {
+   } else {
        # code
    }
    ```
@@ -404,7 +400,7 @@ publish:
 
 3. **WiFi/Password parameters**
 
-   If your module handles WiFi passphrases or similar string passwords (not security credentials), add to `PSScriptAnalyzerSettings.psd1`:
+   If your module handles WiFi passphrases or similar string passwords (not security credentials), add to `.PSScriptAnalyzerSettings.psd1`:
 
    ```powershell
    ExcludeRules = @(
@@ -422,7 +418,10 @@ publish:
 ./build.ps1 -Tasks test
 
 # Run specific test file
-Invoke-Pester -Path tests/Unit/Module.Tests.ps1 -Output Detailed
+Invoke-Pester -Path Tests/Unit/Module/ModuleName.Module.Tests.ps1 -Output Detailed
+
+# Fast loop against source/ (no build)
+./Scripts/Invoke-QuickTest.ps1 -Module
 ```
 
 ### Build Failures
@@ -434,8 +433,8 @@ Invoke-Pester -Path tests/Unit/Module.Tests.ps1 -Output Detailed
    ./build.ps1 -ResolveDependency -Tasks noop
    ```
 
-2. **Module version mismatch**
-   - Check `source/ModuleName.psd1` version matches expectations
+2. **Built version does not match tag**
+   - The tag must be `vX.Y.Z` or `vX.Y.Z-label` (alphanumeric label)
    - Verify tests aren't checking for specific versions
 
 3. **File encoding issues**
@@ -452,8 +451,8 @@ Based on real-world PowerShell Gallery publishing experience:
 - GitHub Actions should be for final validation
 
 ### 2. Use Git Tags for Versions
-- Single source of truth
-- No version mismatch between manifest and tags
+- Single source of truth: the tag sets the version
+- The manifest `ModuleVersion` is informational, so there is nothing to keep in sync
 - Clear release history
 
 ### 3. Prerelease Branch Strategy
@@ -529,11 +528,11 @@ If you already have a module and want to adopt this template's CI/CD:
 # Build only
 ./build.ps1 -Tasks build
 
-# Test only
+# Pester tests only
 ./build.ps1 -Tasks test
 
 # Analyze only
-./build.ps1 -Tasks test
+./Tests/test-local.ps1 -SkipBuild -SkipTests
 
 # Create tag
 git tag -a v1.0.0 -m "Message"
@@ -553,6 +552,5 @@ git push origin :refs/tags/v1.0.0
 
 ### Files to Update for New Release
 
-1. `source/ModuleName.psd1` — set `ModuleVersion` to match your planned tag (e.g., `1.2.0` for tag `v1.2.0`)
-2. `CHANGELOG.md` — add a `## [1.2.0] - YYYY-MM-DD` section
-3. Create and push git tag — **must match manifest version** or the workflow will fail
+1. `CHANGELOG.md` — describe the changes under `## [Unreleased]`
+2. Create and push the git tag (e.g., `v1.2.0`) — it sets the version; no manifest edit is needed

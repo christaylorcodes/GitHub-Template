@@ -74,7 +74,8 @@ Session.vim
 Sessionx.vim
 .netrwhist
 *~
-tags
+# ctags index (root only, so folders/files named 'tags' elsewhere are kept)
+/tags
 
 # ---- PowerShell ----
 modules/
@@ -95,8 +96,15 @@ publish/
 *.key
 *.pem
 *.p12
-*credentials*
-*secret*
+# Credential/secret files. Kept narrow on purpose: '*secret*' would also ignore
+# legitimate code such as Get-Secret.ps1 or Set-SecretValue.Tests.ps1.
+*credential*.xml
+*credentials*.json
+*.credentials
+*secret*.json
+*secrets*.json
+*.secret
+secrets/
 !.github/SECURITY.md
 
 # ---- Claude Code ----
