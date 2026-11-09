@@ -6,9 +6,9 @@ This is the authoritative style guide for all PowerShell projects. It applies to
 
 | Context | Version | Rationale |
 |---|---|---|
-| PowerShell modules | 7.2+ | Minimum LTS version with modern features |
+| PowerShell modules | 7.6+ | Current LTS (7.4 LTS and 7.5 reached end of support 2026-11-10) |
 | Scripts deployed to managed endpoints | 5.1+ | Windows ships with 5.1; can't guarantee 7.x on all endpoints |
-| CI/CD pipelines | 7.4+ | Controlled environment, use latest stable |
+| CI/CD pipelines | 7.6+ | Controlled environment, use latest stable |
 
 When writing a module, do not add 5.1 compatibility unless the module explicitly targets Windows PowerShell. When writing endpoint scripts, avoid 7.x-only syntax (ternary `?:`, null-coalescing `??`, pipeline chain `&&`/`||`).
 

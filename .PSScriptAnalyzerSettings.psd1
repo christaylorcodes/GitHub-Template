@@ -125,13 +125,13 @@
             MaximumLineLength = 120
         }
 
-        # PowerShell 7+ compatibility
+        # Syntax compatibility. NOTE: this rule only compares MAJOR versions, so any
+        # 7.x target behaves the same; it catches 7-only syntax if you add '5.1',
+        # it does not verify compatibility between 7.x releases.
         PSUseCompatibleSyntax = @{
             Enable         = $true
             TargetVersions = @(
-                '7.2',
-                '7.4',
-                '7.5'
+                '7.6'
             )
         }
 

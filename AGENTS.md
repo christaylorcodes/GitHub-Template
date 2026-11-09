@@ -6,7 +6,7 @@ This file provides context for AI coding agents (Claude Code, GitHub Copilot, Cu
 
 **ModuleName** is a PowerShell module hosted at <https://github.com/YOUR-USERNAME/YOUR-REPO>.
 
-- **Language**: PowerShell 7.2+
+- **Language**: PowerShell 7.6+ (current LTS; 7.4 and 7.5 reached end of support 2026-11-10)
 - **Build System**: Sampler / ModuleBuilder
 - **Test Framework**: Pester 5.6+
 - **Linter**: PSScriptAnalyzer
@@ -27,7 +27,7 @@ This file provides context for AI coding agents (Claude Code, GitHub Copilot, Cu
 
 ## Build Commands
 
-All commands require **PowerShell 7.2+** and use Sampler/ModuleBuilder with InvokeBuild as the task runner. Configuration lives in `build.yaml` and `RequiredModules.psd1`.
+All commands require **PowerShell 7.6+** and use Sampler/ModuleBuilder with InvokeBuild as the task runner. Configuration lives in `build.yaml` and `RequiredModules.psd1`.
 
 ```powershell
 # Individual tasks
@@ -182,7 +182,7 @@ Enforced by PSScriptAnalyzer (`.PSScriptAnalyzerSettings.psd1`) and `.editorconf
 - Single quotes for constants, double quotes only for interpolation
 - Approved verbs only (`Get-Verb`)
 - Comment-based help required before all exported functions
-- Target PowerShell 7.2+ for modules (see [StyleGuide](docs/PowerShell-StyleGuide.md) for endpoint script targets)
+- Target PowerShell 7.6+ for modules (see [StyleGuide](docs/PowerShell-StyleGuide.md) for endpoint script targets)
 - PowerShell files: UTF-8 with BOM, CRLF line endings
 - Use `Write-Verbose`/`Write-Debug` in modules, Windows Event Log (default) in standalone scripts
 

@@ -24,7 +24,7 @@
 .NOTES
     File Name      : Test-Template.ps1
     Author         : Chris Taylor
-    Prerequisite   : PowerShell 7.2 or higher
+    Prerequisite   : PowerShell 7.6 or higher
     Copyright 2025 - Chris Taylor Codes
 #>
 

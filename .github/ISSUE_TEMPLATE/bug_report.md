@@ -29,7 +29,7 @@ assignees: ''
 <!-- Please complete the following information -->
 - **OS**: [e.g., Windows 11, Windows Server 2022]
 - **Version**: [e.g., v1.0.0]
-- **PowerShell Version** (if applicable): [e.g., 7.4.0]
+- **PowerShell Version** (if applicable): [e.g., 7.6.9]
 - **Browser** (if applicable): [e.g., Chrome 120, Firefox 121]
 
 ## Additional Context

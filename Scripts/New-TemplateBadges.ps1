@@ -43,7 +43,7 @@
 .NOTES
     File Name      : New-TemplateBadges.ps1
     Author         : Chris Taylor
-    Prerequisite   : PowerShell 5.1 or higher
+    Prerequisite   : PowerShell 7.6 or higher
     Copyright 2025 - Chris Taylor Codes
 #>
 
