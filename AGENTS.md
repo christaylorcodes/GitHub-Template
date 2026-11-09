@@ -34,7 +34,7 @@ All commands require **PowerShell 7.6+** and use Sampler/ModuleBuilder with Invo
 ./build.ps1                         # Default task: build + test
 ./build.ps1 -Tasks build            # Clean -> dependency version check -> Build to output/ -> release notes from CHANGELOG
 ./build.ps1 -Tasks test             # Run Pester tests against the built module (no PSScriptAnalyzer)
-./build.ps1 -Tasks docs             # Regenerate markdown help in docs/help/en-US/ from comment-based help
+./build.ps1 -Tasks docs             # Regenerate markdown help in docs/help/<ModuleName>/ from comment-based help
 
 # Bootstrap + build (first time or after dependency changes)
 ./build.ps1 -ResolveDependency -Tasks build

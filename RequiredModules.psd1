@@ -17,7 +17,7 @@
     Pester                = '[6.2.0,7.0.0)'
     Sampler               = '[0.120.1,0.121.0)'  # 0.x: minor versions may break tasks
     ModuleBuilder         = '[3.2.18,4.0.0)'
-    platyPS               = '[0.14.2,1.0.0)'     # Sampler's docs tasks use the 0.x API
+    'Microsoft.PowerShell.PlatyPS' = '[1.0.3,2.0.0)'  # docs task (.build/docs.ps1); replaces legacy platyPS 0.14
 
     # Floating: low risk
     InvokeBuild           = 'latest'

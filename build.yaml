@@ -36,10 +36,7 @@ BuildWorkflow:
   docs:
     - Clean
     - Build_Module_ModuleBuilder
-    - Update_markdown_help_source
-    - Postprocess_PlatyPS_docs
-    - Generate_MAML_from_markdown_help_source
-    - Assert_MAML_help_generated
+    - Generate_Markdown_Help
 
 ####################################################
 #       Sampler Pipeline Configuration             #
@@ -102,11 +99,10 @@ Pester:
 #       PlatyPS / Documentation Configuration      #
 ####################################################
 
-# Markdown help source. Must contain ONLY culture folders (en-US, ...);
-# Sampler treats every subfolder as a locale.
+# Generated markdown command help (./build.ps1 -Tasks docs, task Generate_Markdown_Help in
+# .build/docs.ps1, using Microsoft.PowerShell.PlatyPS 1.x). Files go to <HelpSourceFolder>/<module name>/.
+# No MAML is produced: Get-Help uses the comment-based help in the built module.
 HelpSourceFolder: docs/help
-HelpCultureInfo: en-US  # informational; Sampler's task uses the folder names
-CopyHelpMamlToBuiltModuleBase: true
 
 ####################################################
 #       PSScriptAnalyzer Configuration            #

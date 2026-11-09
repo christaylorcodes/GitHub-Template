@@ -126,4 +126,4 @@ This project welcomes contributions from AI coding agents. AI agents follow the 
 
 ### Documentation Styleguide
 
--   Documentation is built with [platyPS](https://github.com/PowerShell/platyPS).
+-   Command reference docs are generated from comment-based help with [Microsoft.PowerShell.PlatyPS](https://github.com/PowerShell/platyPS) (`./build.ps1 -Tasks docs`).
