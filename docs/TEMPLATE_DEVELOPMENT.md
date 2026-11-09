@@ -4,10 +4,14 @@
 
 ## Template Scripts
 
-- `Scripts/Initialize-Repository.ps1` — Replaces all template placeholders with project-specific values, renames module files, populates the manifest, creates backup, optionally initializes git
+- `Scripts/Initialize-Repository.ps1` — Replaces all template placeholders with project-specific values, renames module files, populates the manifest (new GUID), resets CHANGELOG, removes template-only files, optionally initializes git. It does not create backups; use `-WhatIf` to preview
+- `Scripts/Initialize-Labels.ps1` — Creates recommended GitHub labels for AI workflow via `gh` CLI (kept in initialized projects)
+
+Template-only scripts (removed by `Initialize-Repository.ps1`):
+
 - `Scripts/Test-Template.ps1` — Validates template integrity (required files, links, placeholders, structure)
 - `Scripts/New-TemplateBadges.ps1` — Generates shields.io badges for various package managers and CI systems
-- `Scripts/Initialize-Labels.ps1` — Creates recommended GitHub labels for AI workflow via `gh` CLI
+- `Scripts/Initialize-Roadmap.ps1` — Seeds the template repository's roadmap issues/milestones
 
 ## New Repository Setup (AI Agents)
 
@@ -31,7 +35,7 @@ Do NOT start modifying files until you have gathered all required inputs from th
 ./Scripts/Initialize-Repository.ps1 -Name "MyProject" -Description "..." -Author "..." -GitHubUsername "user"
 
 # Generate badges
-./Scripts/New-TemplateBadges.ps1 -ProjectName "MyProject" -GitHubUsername "user"
+./Scripts/New-TemplateBadges.ps1 -GitHubUsername "user" -RepositoryName "MyProject" -PackageManager PSGallery -PackageName "MyProject"
 
 # Create AI workflow labels on a GitHub repo
 ./Scripts/Initialize-Labels.ps1

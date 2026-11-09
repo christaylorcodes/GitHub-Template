@@ -46,8 +46,7 @@
             }
 
             return $result
-        }
-        catch {
+        } catch {
             # Re-throw as a terminating error attributed to this function (not to the
             # line inside it). Do NOT use Write-Error -Message ... -ErrorRecord $_:
             # those parameters are in different parameter sets and fail to bind.

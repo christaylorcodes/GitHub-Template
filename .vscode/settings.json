@@ -3,7 +3,8 @@
     "powershell.codeFormatting.preset": "Custom",
     "powershell.codeFormatting.openBraceOnSameLine": true,
     "powershell.codeFormatting.newLineAfterOpenBrace": true,
-    "powershell.codeFormatting.newLineAfterCloseBrace": true,
+    // false keeps "} catch {" / "} else {" cuddled, matching PSPlaceCloseBrace in the analyzer settings
+    "powershell.codeFormatting.newLineAfterCloseBrace": false,
     "powershell.codeFormatting.whitespaceBeforeOpenBrace": true,
     "powershell.codeFormatting.whitespaceBeforeOpenParen": true,
     "powershell.codeFormatting.whitespaceAroundOperator": true,
@@ -38,7 +39,7 @@
 
     // Files to exclude from explorer
     "files.exclude": {
-        "**/Output": true,
+        "**/output": true,
         "**/.vs": true,
         "**/*.coverage.xml": true,
         "**/testResults.xml": true
@@ -46,7 +47,7 @@
 
     // Search exclusions
     "search.exclude": {
-        "**/Output": true,
+        "**/output": true,
         "**/.vs": true
     },
 

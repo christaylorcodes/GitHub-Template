@@ -100,7 +100,7 @@ When using this template for your own project, please:
    - Review script signatures when available
 
 5. **Regular Security Audits**
-   - Run `Scripts\Test-Template.ps1` regularly to check for issues
+   - Run `./Tests/test-local.ps1` (build, PSScriptAnalyzer, Pester) before every push
    - Review and update this SECURITY.md for your project's needs
    - Monitor GitHub security advisories for dependencies
 
@@ -109,9 +109,9 @@ When using this template for your own project, please:
 ### PowerShell Script Execution
 
 The template includes PowerShell scripts that modify files on your system:
-- `Scripts\Initialize-Repository.ps1` - Modifies template files
-- `Scripts\Test-Template.ps1` - Reads files and makes web requests (when link checking enabled)
-- `Scripts\New-TemplateBadges.ps1` - Can modify README.md
+- `Scripts\Initialize-Repository.ps1` - Modifies template files and deletes template-only files (run once)
+- `Scripts\Test-Template.ps1` - Template-maintainer check only (removed by initialization); reads files and makes web requests when link checking is enabled
+- `Scripts\New-TemplateBadges.ps1` - Template-maintainer tool (removed by initialization); can modify README.md
 
 **Recommendations:**
 - Review scripts before execution

@@ -122,7 +122,7 @@ This project welcomes contributions from AI coding agents. AI agents follow the 
 
 ### PowerShell Styleguide
 
--   Refer to the [unofficial guide](https://github.com/PoshCode/PowerShellPracticeAndStyle).
+-   Follow the project [PowerShell Style Guide](../docs/PowerShell-StyleGuide.md).
 
 ### Documentation Styleguide
 

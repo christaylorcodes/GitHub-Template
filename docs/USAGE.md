@@ -12,7 +12,10 @@
 
 ### From PowerShell Gallery
 ```powershell
-Install-Module -Name ModuleName -Scope CurrentUser
+Install-PSResource -Name ModuleName -Scope CurrentUser
+
+# Prerelease versions
+Install-PSResource -Name ModuleName -Prerelease
 ```
 
 ### From Source
@@ -21,9 +24,12 @@ Install-Module -Name ModuleName -Scope CurrentUser
 git clone https://github.com/YOUR-USERNAME/ModuleName.git
 cd ModuleName
 
-# Build and install
+# Build (writes the module to output/, does not install it)
 .\build.ps1 -ResolveDependency -Tasks noop
 .\build.ps1 -Tasks build
+
+# Import the built module
+Import-Module ./output/ModuleName/<version>/ModuleName.psd1
 ```
 
 ## Quick Start
@@ -160,7 +166,7 @@ $data | ConvertTo-Json | Out-File data.json
 Get-Module -ListAvailable -Name ModuleName
 
 # If not found, reinstall
-Install-Module -Name ModuleName -Force
+Install-PSResource -Name ModuleName -Reinstall
 ```
 
 **Issue: Function not recognized**
@@ -174,8 +180,8 @@ Get-Command -Module ModuleName
 
 **Issue: Permission errors**
 ```powershell
-# Run as administrator or install to CurrentUser scope
-Install-Module -Name ModuleName -Scope CurrentUser
+# Install to CurrentUser scope (the default) instead of AllUsers
+Install-PSResource -Name ModuleName -Scope CurrentUser
 ```
 
 ### Getting Help

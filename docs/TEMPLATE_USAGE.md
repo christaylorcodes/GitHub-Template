@@ -25,6 +25,9 @@ Before you begin, ensure you have:
 - [x] **Text editor** (VS Code, Sublime, Notepad++, etc.)
 - [x] (Optional) **GitHub CLI (`gh`)** for repository creation
 
+> **PowerShell version:** the template targets PowerShell 7.6. To support hosts still on
+> 7.4, lower `PowerShellVersion` in `source/<Module>.psd1` to `'7.4'`.
+
 ### Checking Prerequisites
 
 ```powershell
@@ -100,7 +103,10 @@ gh repo create MyNewProject --public --source=. --remote=origin --push
 
 ## Manual Setup
 
-If you prefer manual setup or can't use PowerShell:
+**Recommended:** use `Scripts/Initialize-Repository.ps1` (see [Quick Start](#quick-start-automated)).
+It performs every step below, including the module renames, GUID and workflow edits that
+are easy to miss by hand. Run it with `-WhatIf` first to preview. The manual steps are
+listed here so you know exactly what it changes.
 
 ### Step 1: Get the Template
 
@@ -148,7 +154,7 @@ GitHub-Template  → YourProjectName
 - Adjust style guides for your project type
 - Update email/contact information
 
-### Step 4: Update DONATE.md
+### Step 4: Update docs/DONATE.md
 
 - Update PayPal link (line 10): `paypal.me/YourPayPalName`
 - Generate new BTC QR code or remove if not using
@@ -203,7 +209,30 @@ docs/media/
 - Keep file size under 2MB
 - Use tools like ScreenToGif, LICEcap, or Kap
 
-### Step 9: Initialize Git
+### Step 9: Update Module Source, Tests, Workflows and Build Config
+
+Replace `<Module>` with your module name:
+
+1. Rename the module files and replace `ModuleName` inside them:
+   - `source/ModuleName.psd1` → `source/<Module>.psd1`
+   - `source/ModuleName.psm1` → `source/<Module>.psm1`
+   - `source/en-US/about_ModuleName.help.txt` → `source/en-US/about_<Module>.help.txt`
+   - `Tests/Unit/Module/ModuleName.Module.Tests.ps1` → `Tests/Unit/Module/<Module>.Module.Tests.ps1`
+2. Replace `ModuleName` in `source/Public/Get-ModuleInfo.ps1`, its test in
+   `Tests/Unit/Public/`, `Templates/*.ps1`, `AGENTS.md`, `docs/USAGE.md`,
+   `docs/PUBLISHING.md` and `docs/examples/`.
+3. In the manifest, set a new `GUID` (`[guid]::NewGuid()`), plus `Author`,
+   `CompanyName`, `Description` and `Copyright`.
+4. In `.github/workflows/ci.yml` and `.github/workflows/pr-validation.yml`, set
+   `MODULE_NAME: <Module>`.
+5. In `build.yaml`, set `GitHubConfigUserName` and `GitHubConfigUserEmail`.
+6. Reset `CHANGELOG.md` to an empty `## [Unreleased]` section.
+7. Delete the template-only files: root `DONATE.md` and `Media/` (mirrors),
+   `Scripts/Test-Template.ps1`, `Scripts/New-TemplateBadges.ps1`,
+   `Scripts/Initialize-Roadmap.ps1`, `docs/TEMPLATE_USAGE.md`,
+   `docs/TEMPLATE_DEVELOPMENT.md` and `Tests/Template/`.
+
+### Step 10: Initialize Git
 
 ```bash
 git init
@@ -308,44 +337,22 @@ This generates shields.io badges for:
 - Code coverage
 - Donations
 
-### Setting Up GitHub Actions
+### GitHub Actions
 
-1. Create `.github/workflows/ci.yml`:
+CI is already included; you do not need to create a workflow:
 
-```yaml
-name: CI
+- `.github/workflows/ci.yml` builds, tests (Ubuntu + Windows), analyzes, and on a
+  `vX.Y.Z` / `vX.Y.Z-label` tag publishes to PowerShell Gallery
+- `.github/workflows/pr-validation.yml` checks CHANGELOG updates on pull requests
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+To publish, create the `production` and `prerelease` environments with a
+`PSGALLERY_API_KEY` environment secret. See [PUBLISHING.md](PUBLISHING.md).
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run tests
-        run: |
-          # Your test commands here
-          echo "Running tests..."
-```
+### Dependabot
 
-2. Update badge URL in README.md
-
-### Setting Up Dependabot
-
-Create `.github/dependabot.yml`:
-
-```yaml
-version: 2
-updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-```
+`.github/dependabot.yml` is already included. Actions in the workflows are pinned to
+commit SHAs, and Dependabot opens one grouped pull request per week when GitHub Actions
+updates are available. Review and merge them like any other PR.
 
 ### Adding Issue Templates
 
@@ -367,7 +374,7 @@ For donation addresses:
 
 **PowerShell (requires qrcode module):**
 ```powershell
-Install-Module -Name QRCodeGenerator
+Install-PSResource -Name QRCodeGenerator
 New-QRCode -Content "bc1q..." -OutPath "./docs/media/BTC.png"
 ```
 
@@ -375,34 +382,23 @@ New-QRCode -Content "bc1q..." -OutPath "./docs/media/BTC.png"
 
 ## Validation
 
-### Running the Validation Script
+### Validating Your Project After Initialization
 
-Test your repository setup:
+`Scripts/Test-Template.ps1` validates the template itself and is deleted by
+`Initialize-Repository.ps1`, so it is not available in your project. Instead:
 
 ```powershell
-# Run full validation (includes link checking)
-.\Scripts\Test-Template.ps1
+# Build, analyze and test the renamed module
+./build.ps1 -ResolveDependency -Tasks noop
+./Tests/test-local.ps1
 
-# Run without external link checking (faster)
-.\Scripts\Test-Template.ps1 -SkipLinkCheck
-
-# Run with verbose output
-.\Scripts\Test-Template.ps1 -SkipLinkCheck -Verbose
+# Look for leftover placeholders (excludes legitimate -ModuleName / $ModuleName)
+git grep -nE '(^|[^-$:A-Za-z0-9])ModuleName([^A-Za-z0-9]|$)'
+git grep -n "YOUR-USERNAME"
+git grep -n "GitHub-Template"
 ```
 
-**What it checks:**
-- ✓ Required files exist
-- ✓ Media files exist
-- ✓ Internal links work
-- ✓ External links accessible (if not skipped)
-- ✓ No leftover placeholder text
-- ✓ Proper file structure
-- ✓ Git configuration
-
-**Expected results:**
-- Some warnings are normal (missing media files if not added yet)
-- Errors should be fixed before pushing to GitHub
-- Clean working tree recommended
+All three test-local stages (build, analyze, test) must pass before pushing.
 
 ### Manual Validation Checklist
 
@@ -471,7 +467,6 @@ References to "GitHub-Template" or "ConnectWiseManageAPI" remain
 ```
 
 **Solution:**
-- Run validation script: `.\Test-Template.ps1`
 - Search repository: `git grep "GitHub-Template"`
 - Use Find and Replace in your editor
 - Check CHANGELOG.md (may reference old projects)
@@ -490,7 +485,7 @@ References to "GitHub-Template" or "ConnectWiseManageAPI" remain
 ### During Setup
 
 1. **Use the automation script** - Saves time and reduces errors
-2. **Validate frequently** - Run `Test-Template.ps1` after changes
+2. **Validate frequently** - Run `./Tests/test-local.ps1` after changes
 3. **Test locally** - Preview README in your editor
 4. **Commit incrementally** - Don't make all changes at once
 
@@ -498,8 +493,8 @@ References to "GitHub-Template" or "ConnectWiseManageAPI" remain
 
 1. **Add a demo** - Show don't tell (GIF, video, or screenshots)
 2. **Write clear installation** - Test instructions on fresh machine
-3. **Set up CI/CD** - Automate testing and deployment
-4. **Enable Dependabot** - Keep dependencies updated
+3. **Configure publishing** - Create the `production`/`prerelease` environments and API key secret
+4. **Merge Dependabot PRs** - Weekly grouped GitHub Actions updates
 5. **Engage community** - Respond to issues and PRs
 
 ### Writing Good Documentation
@@ -563,9 +558,9 @@ After setting up your repository:
 
 1. **Write your code!** - The template is ready, now build your project
 
-2. **Set up CI/CD** - Automate testing and deployment
+2. **Configure publishing** - CI is included; add the environments and API key secret ([PUBLISHING.md](PUBLISHING.md))
 
-3. **Publish your package** - PowerShell Gallery, npm, PyPI, etc.
+3. **Publish your module** - Push a `vX.Y.Z` tag to release to PowerShell Gallery
 
 4. **Share your project** - Social media, Reddit, Hacker News
 
@@ -579,12 +574,12 @@ If you need help with this template:
 
 1. **Check the documentation:**
    - [README.md](../README.md) - Quick overview
-   - [CLAUDE.md](../CLAUDE.md) - Comprehensive guide
+   - [AGENTS.md](../AGENTS.md) - Comprehensive guide
    - This file - Step-by-step instructions
 
 2. **Run validation:**
    ```powershell
-   .\Test-Template.ps1 -Verbose
+   ./Tests/test-local.ps1
    ```
 
 3. **Search for issues:**
