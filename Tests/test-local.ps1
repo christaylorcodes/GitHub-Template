@@ -34,13 +34,15 @@ function Invoke-BuildStep {
     param([string[]]$Tasks)
     $global:LASTEXITCODE = 0
     try {
-        & $buildScript -Tasks $Tasks
+        # Send build output to the host: anything left in the pipeline would become part of
+        # this function's return value and make the pass/fail check below always truthy.
+        & $buildScript -Tasks $Tasks | Out-Host
     }
     catch {
         Write-Host $_ -ForegroundColor Red
         return $false
     }
-    return ($LASTEXITCODE -eq 0)
+    return [bool]($LASTEXITCODE -eq 0)
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
