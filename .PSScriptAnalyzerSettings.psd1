@@ -1,4 +1,4 @@
-@{
+﻿@{
     # Use the PowerShell Gallery rules as baseline
     # These are the recommended rules for modules published to the gallery
     # IncludeDefaultRules = $true
@@ -107,6 +107,8 @@
             CheckPipeForRedundantWhitespace = $false
             CheckSeparator                  = $true
             CheckParameter                  = $false
+            # Allow aligned '=' in hashtables (required by PSAlignAssignmentStatement)
+            IgnoreAssignmentOperatorInsideHashTable = $true
         }
 
         PSAlignAssignmentStatement = @{

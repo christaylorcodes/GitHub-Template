@@ -4,9 +4,9 @@
 ####################################################
 
 SourcePath: source
-CopyPaths: []
-# Uncomment when en-US help files exist:
-#  - en-US
+# Folders under source/ copied as-is into the built module (en-US holds about_* help)
+CopyPaths:
+  - en-US
 Encoding: UTF8
 VersionedOutputDirectory: true
 
@@ -31,8 +31,13 @@ BuildWorkflow:
   test:
     - Pester_Tests_Stop_On_Fail
 
-  publish:
-    - publish_module_to_gallery
+  docs:
+    - Clean
+    - Build_Module_ModuleBuilder
+    - Update_markdown_help_source
+    - Postprocess_PlatyPS_docs
+    - Generate_MAML_from_markdown_help_source
+    - Assert_MAML_help_generated
 
 ####################################################
 #       Sampler Pipeline Configuration             #
@@ -65,21 +70,40 @@ TaskHeader: |
 ####################################################
 
 Pester:
-  Path:
-    - Tests
-  ExcludeTag:
-    - Integration
-  Tag:
-  OutputFile: output/testResults/testResults.xml
-  OutputFormat: NUnitXml
-  PassThru: true
+  Configuration:
+    Run:
+      Path:
+        - Tests
+      ExcludePath:
+    Filter:
+      Tag:
+      ExcludeTag:
+        - Live
+        - Integration
+    Output:
+      Verbosity:
+    CodeCoverage:
+      Path:
+      OutputFormat:
+      CoveragePercentTarget: 0
+      OutputPath: JaCoCo_coverage.xml  # relative to output/testResults
+      OutputEncoding: ascii
+      ExcludeTests:
+    TestResult:
+      OutputFormat: NUnitXml
+      OutputPath:
+      OutputEncoding:
+      TestSuiteName:
+  ExcludeFromCodeCoverage:
 
 ####################################################
 #       PlatyPS / Documentation Configuration      #
 ####################################################
 
-HelpSourceFolder: docs
-HelpCultureInfo: en-US
+# Markdown help source. Must contain ONLY culture folders (en-US, ...);
+# Sampler treats every subfolder as a locale.
+HelpSourceFolder: docs/help
+HelpCultureInfo: en-US  # informational; Sampler's task uses the folder names
 CopyHelpMamlToBuiltModuleBase: true
 
 ####################################################

@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Release:** prerelease tags (`v1.2.0-beta1`) were published to PSGallery as stable because the
+  source manifest had no `Prerelease` key; CI now verifies the built version matches the tag exactly
+- **Release:** tag values are passed to scripts through `env:` instead of inline interpolation
+  (script injection in the job holding the PSGallery key); tags must match `vX.Y.Z` or `vX.Y.Z-label`
+- **Release:** a duplicate version now fails the publish on the first attempt instead of being
+  skipped silently while a GitHub release is still created
+- **Release:** tag-on-branch check runs in the build job (full history) and fails clearly
+- **Build:** `CopyPaths: en-US` pointed at a missing folder; the about topic now lives in
+  `source/en-US/` and ships in the built module
+- **Docs build:** help source moved to `docs/help/` (Sampler treated every `docs/` subfolder as a
+  locale); the build now fails if no MAML help is produced
+- **Tests:** `Invoke-QuickTest.ps1` always tests `source/` (never a stale build), uses pinned
+  `output/RequiredModules`, fails when zero tests run or a test file fails to load, and always
+  emits JSON in Structured mode
+- **Templates:** `Write-Error -Message ... -ErrorRecord $_` fails to bind; replaced with
+  `$PSCmdlet.ThrowTerminatingError($_)` in templates, `Get-ModuleInfo` and the style guide
+- **Initialize-Repository:** no longer rewrites Pester's `-ModuleName`; literal, case-sensitive
+  replacements (names like `O'Brien` / text like `$5` survive); copyright year now updated;
+  workflows and `build.yaml` placeholders replaced; template-only files and mirrors removed;
+  CHANGELOG reset to an `[Unreleased]` stub
+- **New-Function:** writes UTF-8 with BOM, cross-platform paths and author fallback
+- **Test-Template:** updated for the current repository layout
+- `.editorconfig` inline comments (invalid per spec) disabled the PowerShell `charset`/`end_of_line` rules
+
+### Added
+
+- `Tests/Template/Initialize-Repository.Tests.ps1` guards the initialization script end to end
+- CI runs on `fix/**`, `chore/**`, `docs/**`, `feature/**` branches and via `workflow_dispatch`;
+  least-privilege `permissions`, `persist-credentials: false`, publish `concurrency`
+
+### Changed
+
+- Publishing uses `Publish-PSResource` (PSResourceGet); the unused `publish` build workflow was removed
+
 ## [1.1.0] - 2026-02-01
 
 ### Added

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Validates the GitHub Template repository for common issues.
 
@@ -24,7 +24,7 @@
 .NOTES
     File Name      : Test-Template.ps1
     Author         : Chris Taylor
-    Prerequisite   : PowerShell 5.1 or higher
+    Prerequisite   : PowerShell 7.2 or higher
     Copyright 2025 - Chris Taylor Codes
 #>
 
@@ -73,18 +73,52 @@ function Test-RequiredFiles {
     Write-ValidationHeader "Checking Required Files"
 
     $requiredFiles = @(
+        # Docs and community
         'README.md'
-        'CONTRIBUTING.md'
-        'docs\DONATE.md'
+        '.github/CONTRIBUTING.md'
+        'docs/DONATE.md'
         'LICENSE'
         'CLAUDE.md'
         'AGENTS.md'
         'CHANGELOG.md'
         '.gitignore'
-        'Scripts\Initialize-Repository.ps1'
-        'Scripts\Test-Template.ps1'
-        'Scripts\New-TemplateBadges.ps1'
-        'Scripts\Initialize-Labels.ps1'
+        '.editorconfig'
+        '.PSScriptAnalyzerSettings.psd1'
+
+        # Template tooling
+        'Scripts/Initialize-Repository.ps1'
+        'Scripts/Test-Template.ps1'
+        'Scripts/New-TemplateBadges.ps1'
+        'Scripts/Initialize-Labels.ps1'
+        'Scripts/New-Function.ps1'
+        'Scripts/Invoke-QuickTest.ps1'
+
+        # Module source
+        'source/ModuleName.psd1'
+        'source/ModuleName.psm1'
+        'source/en-US/about_ModuleName.help.txt'
+
+        # Build system
+        'build.ps1'
+        'build.yaml'
+        'RequiredModules.psd1'
+        'Resolve-Dependency.ps1'
+        'Resolve-Dependency.psd1'
+
+        # CI
+        '.github/workflows/ci.yml'
+        '.github/workflows/pr-validation.yml'
+
+        # Scaffolding templates
+        'Templates/Function.ps1'
+        'Templates/PrivateFunction.ps1'
+        'Templates/Test.Tests.ps1'
+        'Templates/PrivateTest.Tests.ps1'
+
+        # Tests
+        'Tests/TestHelpers/TestHelper.psm1'
+        'Tests/Unit/Module/ModuleName.Module.Tests.ps1'
+        'Tests/test-local.ps1'
     )
 
     foreach ($file in $requiredFiles) {
@@ -97,12 +131,12 @@ function Test-RequiredFiles {
 
     # Check for GitHub templates
     $githubTemplates = @(
-        '.github\ISSUE_TEMPLATE\bug_report.md'
-        '.github\ISSUE_TEMPLATE\feature_request.md'
-        '.github\ISSUE_TEMPLATE\ai_task.md'
-        '.github\ISSUE_TEMPLATE\config.yml'
-        '.github\PULL_REQUEST_TEMPLATE.md'
-        '.github\copilot-instructions.md'
+        '.github/ISSUE_TEMPLATE/bug_report.md'
+        '.github/ISSUE_TEMPLATE/feature_request.md'
+        '.github/ISSUE_TEMPLATE/ai_task.md'
+        '.github/ISSUE_TEMPLATE/config.yml'
+        '.github/PULL_REQUEST_TEMPLATE.md'
+        '.github/copilot-instructions.md'
     )
 
     foreach ($template in $githubTemplates) {
@@ -118,10 +152,10 @@ function Test-RequiredFiles {
 function Test-MediaFiles {
     Write-ValidationHeader "Checking Media Files"
 
-    $mediaDir = "Media"
+    $mediaDir = 'docs/media'
 
     if (-not (Test-Path $mediaDir)) {
-        Add-ValidationError "Media directory does not exist"
+        Add-ValidationError "Media directory does not exist: $mediaDir"
         return
     }
 
@@ -151,7 +185,7 @@ function Test-MarkdownLinks {
     Write-ValidationHeader "Checking Markdown Links"
 
     $markdownFiles = Get-ChildItem -Path . -Filter "*.md" -Recurse -File |
-        Where-Object { $_.FullName -notmatch '\\node_modules\\|\\vendor\\|\\.git\\|\\Output\\|\\\.claude\\' }
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|vendor|\.git|output|\.claude)[\\/]' }
 
     foreach ($mdFile in $markdownFiles) {
         $content = Get-Content $mdFile.FullName -Raw
@@ -227,7 +261,7 @@ function Test-ExternalLinks {
     Write-ValidationHeader "Checking External URLs"
 
     $markdownFiles = Get-ChildItem -Path . -Filter "*.md" -Recurse -File |
-        Where-Object { $_.FullName -notmatch '\\node_modules\\|\\vendor\\|\\.git\\|\\Output\\|\\\.claude\\' }
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|vendor|\.git|output|\.claude)[\\/]' }
 
     $externalUrls = @{}
 
@@ -338,7 +372,7 @@ function Test-FileStructure {
         $readme = Get-Content 'README.md' -Raw
 
         $requiredSections = @{
-            '## Installation' = 'Installation section'
+            '## Getting Started' = 'Getting Started section'
             '## (\[)?Contributing' = 'Contributing section'
             'CONTRIBUTING.md' = 'Link to contributing guide'
         }
@@ -355,8 +389,8 @@ function Test-FileStructure {
     }
 
     # Check CONTRIBUTING.md structure
-    if (Test-Path 'CONTRIBUTING.md') {
-        $contributing = Get-Content 'CONTRIBUTING.md' -Raw
+    if (Test-Path '.github/CONTRIBUTING.md') {
+        $contributing = Get-Content '.github/CONTRIBUTING.md' -Raw
 
         if ($contributing -match 'Bug Reports|Reporting Bugs') {
             Add-ValidationSuccess "CONTRIBUTING.md contains bug reporting section"

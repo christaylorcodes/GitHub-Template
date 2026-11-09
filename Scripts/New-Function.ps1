@@ -1,4 +1,4 @@
-#requires -Version 7.2
+﻿#requires -Version 7.2
 
 <#
 .SYNOPSIS
@@ -38,7 +38,7 @@ param(
     [string]$Type,
 
     [Parameter(Mandatory = $false)]
-    [string]$Author = $env:USERNAME,
+    [string]$Author = ($env:USERNAME ?? $env:USER ?? 'Unknown'),
 
     [Parameter(Mandatory = $false)]
     [string]$ModuleName,
@@ -46,6 +46,15 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$Force
 )
+
+# Replace the 'ModuleName' placeholder as a whole token only, so Pester's
+# -ModuleName parameter and $ModuleName variables are not rewritten
+function Set-ModuleNameToken([string]$Content, [string]$Name) {
+    [regex]::Replace($Content, '(?<![-$:A-Za-z0-9])ModuleName(?![A-Za-z0-9])',
+        [System.Text.RegularExpressions.MatchEvaluator] { param($m) $Name })
+}
+
+$ErrorActionPreference = 'Stop'
 
 # Get project root
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
@@ -81,8 +90,11 @@ if ($Verb -notin $ApprovedVerbs) {
     }
 }
 
-# Determine paths
+# Determine paths (Public/Private may not exist yet: git does not track empty folders)
 $FunctionPath = Join-Path $SourcePath $Type
+if (-not (Test-Path $FunctionPath)) {
+    $null = New-Item -Path $FunctionPath -ItemType Directory -Force
+}
 $FunctionFile = Join-Path $FunctionPath "$FunctionName.ps1"
 
 # Check if function already exists
@@ -108,19 +120,19 @@ if (-not (Test-Path $TemplateFile)) {
 $TemplateContent = Get-Content $TemplateFile -Raw
 
 # Replace placeholders
-$FunctionContent = $TemplateContent -replace 'Verb-Noun', $FunctionName
-$FunctionContent = $FunctionContent -replace 'ConvertTo-InternalFormat', $FunctionName
-$FunctionContent = $FunctionContent -replace 'Your Name', $Author
-$FunctionContent = $FunctionContent -replace 'YYYY-MM-DD', (Get-Date -Format 'yyyy-MM-dd')
-$FunctionContent = $FunctionContent -replace 'ModuleName', $ModuleName
+$FunctionContent = $TemplateContent.Replace('Verb-Noun', $FunctionName)
+$FunctionContent = $FunctionContent.Replace('ConvertTo-InternalFormat', $FunctionName)
+$FunctionContent = $FunctionContent.Replace('Your Name', $Author)
+$FunctionContent = $FunctionContent.Replace('YYYY-MM-DD', (Get-Date -Format 'yyyy-MM-dd'))
+$FunctionContent = Set-ModuleNameToken $FunctionContent $ModuleName
 
-# Create function file
+# Create function file (UTF-8 with BOM, per project convention)
 Write-Host "Creating function file: $FunctionFile" -ForegroundColor Green
-$FunctionContent | Out-File -FilePath $FunctionFile -Encoding utf8
+$FunctionContent | Out-File -FilePath $FunctionFile -Encoding utf8BOM -NoNewline
 
 # Create test file
 $TestSubfolder = if ($Type -eq 'Public') { 'Public' } else { 'Private' }
-$TestPath = Join-Path $TestsPath "Unit\$TestSubfolder"
+$TestPath = Join-Path $TestsPath 'Unit' $TestSubfolder
 $TestFile = Join-Path $TestPath "$FunctionName.Tests.ps1"
 
 if (-not (Test-Path $TestPath)) {
@@ -132,12 +144,12 @@ if (-not (Test-Path $TestFile)) {
     $TestTemplate = Join-Path $TemplatesPath $TestTemplateName
     if (Test-Path $TestTemplate) {
         $TestContent = Get-Content $TestTemplate -Raw
-        $TestContent = $TestContent -replace 'Verb-Noun', $FunctionName
-        $TestContent = $TestContent -replace 'ConvertTo-InternalFormat', $FunctionName
-        $TestContent = $TestContent -replace 'ModuleName', $ModuleName
+        $TestContent = $TestContent.Replace('Verb-Noun', $FunctionName)
+        $TestContent = $TestContent.Replace('ConvertTo-InternalFormat', $FunctionName)
+        $TestContent = Set-ModuleNameToken $TestContent $ModuleName
 
         Write-Host "Creating test file: $TestFile" -ForegroundColor Green
-        $TestContent | Out-File -FilePath $TestFile -Encoding utf8
+        $TestContent | Out-File -FilePath $TestFile -Encoding utf8BOM -NoNewline
     }
 }
 

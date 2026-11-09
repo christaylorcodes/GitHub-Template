@@ -1,4 +1,4 @@
-function Verb-Noun {
+﻿function Verb-Noun {
     <#
     .SYNOPSIS
     Brief description of what the function does
@@ -37,7 +37,7 @@ function Verb-Noun {
 
     Description of pipeline example
     #>
-    [CmdletBinding(SupportsShouldProcess = $false)]
+    [CmdletBinding()]
     [OutputType([System.Management.Automation.PSCustomObject])]
     param(
         [Parameter(
@@ -45,7 +45,7 @@ function Verb-Noun {
             Position = 0,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true,
-            HelpMessage = "Enter a brief help message for this parameter"
+            HelpMessage = 'Enter a brief help message for this parameter'
         )]
         [ValidateNotNullOrEmpty()]
         [string]$ParameterName,
@@ -57,9 +57,6 @@ function Verb-Noun {
     begin {
         Write-Verbose -Message "Starting $($MyInvocation.MyCommand)"
         Write-Debug -Message "Parameters: $($PSBoundParameters | Out-String)"
-
-        # Initialize any variables needed for the entire function
-        $results = [System.Collections.Generic.List[PSCustomObject]]::new()
     }
 
     process {
@@ -67,27 +64,25 @@ function Verb-Noun {
             Write-Verbose -Message "Processing: $ParameterName"
 
             # Main function logic here
-            $output = [PSCustomObject]@{
+            # Emit each object as it is produced (streams through the pipeline)
+            [PSCustomObject]@{
                 PSTypeName = 'ModuleName.ObjectType'
                 Property1  = $ParameterName
                 Property2  = 'Value'
                 Timestamp  = Get-Date
             }
 
-            $results.Add($output)
-
             Write-Verbose -Message "Successfully processed: $ParameterName"
         }
         catch {
-            Write-Error -Message "Failed to process $ParameterName" -ErrorRecord $_
-            throw
+            # Re-throw as a terminating error attributed to this function (not to the
+            # line inside it). Do NOT use Write-Error -Message ... -ErrorRecord $_:
+            # those parameters are in different parameter sets and fail to bind.
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 
     end {
         Write-Verbose -Message "Completed $($MyInvocation.MyCommand)"
-
-        # Return results
-        return $results
     }
 }

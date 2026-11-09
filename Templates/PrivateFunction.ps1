@@ -1,4 +1,4 @@
-function ConvertTo-InternalFormat {
+﻿function ConvertTo-InternalFormat {
     <#
     .SYNOPSIS
     Brief description of what this private/helper function does
@@ -48,8 +48,10 @@ function ConvertTo-InternalFormat {
             return $result
         }
         catch {
-            Write-Error -Message "Error in private function" -ErrorRecord $_
-            throw
+            # Re-throw as a terminating error attributed to this function (not to the
+            # line inside it). Do NOT use Write-Error -Message ... -ErrorRecord $_:
+            # those parameters are in different parameter sets and fail to bind.
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 

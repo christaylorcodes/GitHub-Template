@@ -7,7 +7,7 @@ contact_links:
     url: https://github.com/christaylorcodes/GitHub-Template/blob/main/README.md
     about: Check out our documentation
   - name: 🤝 Contributing Guide
-    url: https://github.com/christaylorcodes/GitHub-Template/blob/main/CONTRIBUTING.md
+    url: https://github.com/christaylorcodes/GitHub-Template/blob/main/.github/CONTRIBUTING.md
     about: Learn how to contribute to this project
   - name: 🤖 AI Contributor Guide
     url: https://github.com/christaylorcodes/GitHub-Template/blob/main/AGENTS.md

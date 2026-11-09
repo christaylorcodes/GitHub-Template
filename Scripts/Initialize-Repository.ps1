@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Initializes a new repository from the GitHub Template.
 
@@ -7,6 +7,12 @@
     It replaces all placeholder values with your project-specific information,
     renames module files, populates the module manifest, updates documentation,
     cleans up template-specific files, and optionally initializes a new git repository.
+
+    All replacements are literal and case-sensitive, so names containing regex
+    or PowerShell special characters (for example O'Brien or "Saves $5") are
+    written exactly as given. The 'ModuleName' placeholder is replaced only as a
+    whole token, so Pester's -ModuleName parameter and $ModuleName variables are
+    left alone.
 
 .PARAMETER Name
     The name of your project (e.g., "MyAwesomeProject")
@@ -18,16 +24,20 @@
     The author/maintainer name (e.g., "John Doe")
 
 .PARAMETER GitHubUsername
-    Your GitHub username (e.g., "johndoe")
+    Your GitHub username or organization (e.g., "johndoe")
 
 .PARAMETER ModuleName
-    The PowerShell module name (if applicable). Defaults to Name parameter.
+    The PowerShell module name. Defaults to the Name parameter.
 
 .PARAMETER CompanyName
     The company or vendor name. Defaults to the Author parameter.
 
 .PARAMETER RepositoryName
     The GitHub repository name (if different from Name). Defaults to Name parameter.
+
+.PARAMETER GitHubEmail
+    Email used by the release tooling (build.yaml GitHubConfig). Defaults to the
+    GitHub no-reply address for GitHubUsername.
 
 .PARAMETER License
     License type. Default: "MIT"
@@ -39,15 +49,10 @@
     If specified, removes donation-related content from the repository
 
 .EXAMPLE
-    .\Initialize-Repository.ps1 -Name "MyProject" -Description "An awesome tool" -Author "John Doe" -GitHubUsername "johndoe"
+    .\Scripts\Initialize-Repository.ps1 -Name "MyProject" -Description "An awesome tool" -Author "John Doe" -GitHubUsername "johndoe"
 
 .EXAMPLE
-    .\Initialize-Repository.ps1 -Name "PowerShellModule" -Description "A PowerShell module" -Author "Jane Smith" -GitHubUsername "janesmith" -InitializeGit
-
-.NOTES
-    Author: Chris Taylor
-    Date: 2025-11-04
-    Version: 1.1.0
+    .\Scripts\Initialize-Repository.ps1 -Name "PowerShellModule" -Description "A PowerShell module" -Author "Jane Smith" -GitHubUsername "janesmith" -InitializeGit
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -62,6 +67,7 @@ param(
     [string]$Author,
 
     [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$')]
     [string]$GitHubUsername,
 
     [Parameter(Mandatory = $false)]
@@ -74,7 +80,10 @@ param(
     [string]$RepositoryName = $Name,
 
     [Parameter(Mandatory = $false)]
-    [string]$License = "MIT",
+    [string]$GitHubEmail = "$GitHubUsername@users.noreply.github.com",
+
+    [Parameter(Mandatory = $false)]
+    [string]$License = 'MIT',
 
     [Parameter(Mandatory = $false)]
     [switch]$InitializeGit,
@@ -87,12 +96,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $CurrentYear = (Get-Date).Year
 $ModuleGuid = [guid]::NewGuid().ToString()
+$TemplateSlug = 'christaylorcodes/GitHub-Template'
+$RepoSlug = "$GitHubUsername/$RepositoryName"
 
-# Validate module name
+# Validate names that end up in file names, URLs and code
 if ($ModuleName -notmatch '^[A-Za-z][A-Za-z0-9._-]*$') {
     throw ("Invalid module name '$ModuleName'. Must start with a letter " +
-        "and contain only letters, digits, dots, underscores, and hyphens.")
+        'and contain only letters, digits, dots, underscores, and hyphens.')
 }
+if ($RepositoryName -notmatch '^[A-Za-z0-9._-]+$') {
+    throw "Invalid repository name '$RepositoryName'. Use only letters, digits, dots, underscores, and hyphens."
+}
+
+# Values written inside single-quoted strings in .psd1 files must have ' doubled
+function ConvertTo-PsdLiteral([string]$Value) { $Value.Replace("'", "''") }
 
 # Color output functions
 function Write-Success {
@@ -115,320 +132,211 @@ function Write-Step {
     Write-Host "`n=== $Message ===" -ForegroundColor Magenta
 }
 
+function Update-TemplateFile {
+    <#
+    .SYNOPSIS
+        Applies literal, case-sensitive replacements to a file, preserving its BOM.
+    .PARAMETER Replace
+        Ordered pairs of @(old, new). Applied in order with String.Replace (no regex).
+    .PARAMETER ReplaceModuleName
+        Replace the 'ModuleName' token as a whole word, skipping '-ModuleName'
+        (Pester parameter) and '$ModuleName' / '$script:ModuleName' variables.
+    .PARAMETER Transform
+        Optional scriptblock receiving and returning the full content.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [object[]]$Replace = @(),
+        [switch]$ReplaceModuleName,
+        [scriptblock]$Transform
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+
+    $fullPath = (Resolve-Path -LiteralPath $Path).Path
+    $bytes = [IO.File]::ReadAllBytes($fullPath)
+    $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    $content = [IO.File]::ReadAllText($fullPath)
+
+    foreach ($pair in $Replace) {
+        $content = $content.Replace([string]$pair[0], [string]$pair[1])
+    }
+
+    if ($ReplaceModuleName) {
+        $content = [regex]::Replace(
+            $content,
+            '(?<![-$:A-Za-z0-9])ModuleName(?![A-Za-z0-9])',
+            [System.Text.RegularExpressions.MatchEvaluator] { param($m) $ModuleName }
+        )
+    }
+
+    if ($Transform) {
+        $content = & $Transform $content
+    }
+
+    $leaf = Split-Path -Leaf $fullPath
+    if ($PSCmdlet.ShouldProcess($leaf, 'Replace placeholders')) {
+        [IO.File]::WriteAllText($fullPath, $content, [Text.UTF8Encoding]::new($hasBom))
+        Write-Success "$leaf customized"
+    }
+}
+
+function Remove-TemplateItem {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (Test-Path -LiteralPath $Path) {
+        if ($PSCmdlet.ShouldProcess($Path, 'Remove template item')) {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+            Write-Success "Removed $Path"
+        }
+    }
+}
+
 # Validate we're in the template directory
-Write-Step "Validating Environment"
-if (-not (Test-Path ".\README.md") -or -not (Test-Path ".\.github\CONTRIBUTING.md")) {
-    throw "This script must be run from the root of the GitHub-Template repository."
+Write-Step 'Validating Environment'
+if (-not (Test-Path '.\README.md') -or -not (Test-Path '.\.github\CONTRIBUTING.md') -or
+    -not (Test-Path '.\source\ModuleName.psd1')) {
+    throw 'This script must be run from the root of an uninitialized GitHub-Template repository.'
 }
-Write-Success "Template directory validated"
+Write-Success 'Template directory validated'
 
-# Update README.md
-Write-Step "Customizing README.md"
-$readme = Get-Content ".\README.md" -Raw
+$commonReplacements = @(
+    , @($TemplateSlug, $RepoSlug)
+    , @('YOUR-USERNAME', $GitHubUsername)
+    , @('yourusername', $GitHubUsername)
+    , @('YOUR-REPO', $RepositoryName)
+)
 
-# Replace placeholders
-$readme = $readme -replace 'GitHub Template', $Name
-$readme = $readme -replace 'YOUR-USERNAME', $GitHubUsername
-$readme = $readme -replace 'YOUR-REPO', $RepositoryName
-$readme = $readme -replace 'YOUR-PROJECT', $Name
-$readme = $readme -replace 'YOUR-PACKAGE', $ModuleName
-$readme = $readme -replace 'YourModuleName', $ModuleName
-$readme = $readme -replace 'christaylorcodes/GitHub-Template', "$GitHubUsername/$RepositoryName"
+# README.md
+Write-Step 'Customizing README.md'
+Update-TemplateFile -Path '.\README.md' -Replace (@(
+        , @('GitHub Template', $Name)
+        , @('YOUR-PROJECT', $Name)
+        , @('YOUR-PACKAGE', $ModuleName)
+        , @('YourModuleName', $ModuleName)
+    ) + $commonReplacements)
 
-if ($PSCmdlet.ShouldProcess('README.md', 'Replace placeholders')) {
-    Set-Content -Path ".\README.md" -Value $readme -NoNewline
-    Write-Success "README.md customized"
-}
-
-# Update CONTRIBUTING.md
-Write-Step "Customizing CONTRIBUTING.md"
-$contributing = Get-Content ".\.github\CONTRIBUTING.md" -Raw
-$contributing = $contributing -replace "Chris Taylor Codes", $Name
-$contributing = $contributing -replace 'christaylorcodes/GitHub-Template', "$GitHubUsername/$RepositoryName"
-if ($PSCmdlet.ShouldProcess('CONTRIBUTING.md', 'Replace placeholders')) {
-    Set-Content -Path ".\.github\CONTRIBUTING.md" -Value $contributing -NoNewline
-    Write-Success "CONTRIBUTING.md customized"
-}
-
-# Update AGENTS.md
-Write-Step "Customizing AGENTS.md"
-if (Test-Path ".\AGENTS.md") {
-    $agents = Get-Content ".\AGENTS.md" -Raw
-    $agents = $agents -replace 'YOUR-USERNAME', $GitHubUsername
-    $agents = $agents -replace 'YOUR-REPO', $RepositoryName
-    $agents = $agents -replace 'ModuleName', $ModuleName
+# Community and AI instruction files
+Write-Step 'Customizing Community and AI Files'
+Update-TemplateFile -Path '.\.github\CONTRIBUTING.md' -Replace (@(, @('Chris Taylor Codes', $Name)) + $commonReplacements)
+Update-TemplateFile -Path '.\AGENTS.md' -Replace $commonReplacements -ReplaceModuleName -Transform {
+    param($c)
     # Strip the Template Development section (template-only content)
-    $agents = $agents -replace '(?s)\r?\n## Template Development.*$', ''
-    if ($PSCmdlet.ShouldProcess('AGENTS.md', 'Replace placeholders')) {
-        Set-Content -Path ".\AGENTS.md" -Value $agents -NoNewline
-        Write-Success "AGENTS.md customized (template section removed)"
-    }
+    $c -replace '(?s)\r?\n## Template Development.*$', ''
+}
+Update-TemplateFile -Path '.\CLAUDE.md' -Replace $commonReplacements
+Update-TemplateFile -Path '.\.github\copilot-instructions.md' -Replace $commonReplacements
+Update-TemplateFile -Path '.\.github\ISSUE_TEMPLATE\config.yml' -Replace $commonReplacements
+Update-TemplateFile -Path '.\.github\SECURITY.md' -Replace (@(, @('christaylor.codes', 'yourdomain.com')) + $commonReplacements)
+Update-TemplateFile -Path '.\.github\CODE_OF_CONDUCT.md' -Replace @(, @('christaylor.codes', 'yourdomain.com'))
+Write-Caution 'Review contact emails in .github/SECURITY.md and .github/CODE_OF_CONDUCT.md'
+
+# LICENSE
+Write-Step 'Customizing LICENSE'
+Update-TemplateFile -Path '.\LICENSE' -Transform {
+    param($c)
+    [regex]::Replace($c, 'Copyright \(c\) \d{4} Chris Taylor',
+        [System.Text.RegularExpressions.MatchEvaluator] { param($m) "Copyright (c) $CurrentYear $Author" })
 }
 
-# Update CLAUDE.md
-Write-Step "Customizing CLAUDE.md"
-if (Test-Path ".\CLAUDE.md") {
-    $claude = Get-Content ".\CLAUDE.md" -Raw
-    $claude = $claude -replace 'YOUR-USERNAME', $GitHubUsername
-    $claude = $claude -replace 'YOUR-REPO', $RepositoryName
-    if ($PSCmdlet.ShouldProcess('CLAUDE.md', 'Replace placeholders')) {
-        Set-Content -Path ".\CLAUDE.md" -Value $claude -NoNewline
-        Write-Success "CLAUDE.md customized"
-    }
+# CHANGELOG.md: start fresh (the template's own history doesn't belong to the new project).
+# Sampler's release task requires an [Unreleased] section.
+Write-Step 'Resetting CHANGELOG.md'
+if ($PSCmdlet.ShouldProcess('CHANGELOG.md', 'Reset to [Unreleased] stub')) {
+    $changelog = @"
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Initial module scaffolding from [GitHub-Template](https://github.com/$TemplateSlug)
+"@
+    [IO.File]::WriteAllText((Join-Path (Get-Location) 'CHANGELOG.md'), $changelog + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    Write-Success 'CHANGELOG.md reset'
 }
 
-# Update copilot-instructions.md
-Write-Step "Customizing copilot-instructions.md"
-$copilotFile = ".\.github\copilot-instructions.md"
-if (Test-Path $copilotFile) {
-    $copilot = Get-Content $copilotFile -Raw
-    $copilot = $copilot -replace 'YOUR-USERNAME', $GitHubUsername
-    $copilot = $copilot -replace 'YOUR-REPO', $RepositoryName
-    if ($PSCmdlet.ShouldProcess('copilot-instructions.md', 'Replace placeholders')) {
-        Set-Content -Path $copilotFile -Value $copilot -NoNewline
-        Write-Success "copilot-instructions.md customized"
-    }
-}
-
-# Update issue template config
-Write-Step "Customizing Issue Template Config"
-$configFile = ".\.github\ISSUE_TEMPLATE\config.yml"
-if (Test-Path $configFile) {
-    $config = Get-Content $configFile -Raw
-    $config = $config -replace 'christaylorcodes/GitHub-Template', "$GitHubUsername/$RepositoryName"
-    if ($PSCmdlet.ShouldProcess('config.yml', 'Replace placeholders')) {
-        Set-Content -Path $configFile -Value $config -NoNewline
-        Write-Success "Issue template config customized"
-    }
-}
-
-# Update LICENSE
-Write-Step "Customizing LICENSE"
-$license = Get-Content ".\LICENSE" -Raw
-$license = $license -replace '2021', $CurrentYear
-$license = $license -replace 'Chris Taylor', $Author
-if ($PSCmdlet.ShouldProcess('LICENSE', 'Replace year and author')) {
-    Set-Content -Path ".\LICENSE" -Value $license -NoNewline
-    Write-Success "LICENSE customized"
-}
-
-# Update CHANGELOG.md
-Write-Step "Customizing CHANGELOG.md"
-if (Test-Path ".\CHANGELOG.md") {
-    $changelog = Get-Content ".\CHANGELOG.md" -Raw
-    $changelog = $changelog -replace 'YOUR-USERNAME', $GitHubUsername
-    $changelog = $changelog -replace 'YOUR-REPO', $RepositoryName
-    if ($PSCmdlet.ShouldProcess('CHANGELOG.md', 'Replace placeholders')) {
-        Set-Content -Path ".\CHANGELOG.md" -Value $changelog -NoNewline
-        Write-Success "CHANGELOG.md customized"
-    }
-}
-
-# Update SECURITY.md
-Write-Step "Customizing SECURITY.md"
-if (Test-Path ".\.github\SECURITY.md") {
-    $security = Get-Content ".\.github\SECURITY.md" -Raw
-    $security = $security -replace 'christaylorcodes/GitHub-Template', "$GitHubUsername/$RepositoryName"
-    $security = $security -replace 'christaylor\.codes', "yourdomain.com"
-    if ($PSCmdlet.ShouldProcess('SECURITY.md', 'Replace placeholders')) {
-        Set-Content -Path ".\.github\SECURITY.md" -Value $security -NoNewline
-        Write-Info "SECURITY.md updated - review contact emails"
-    }
-}
-
-# Update CODE_OF_CONDUCT.md
-Write-Step "Customizing CODE_OF_CONDUCT.md"
-if (Test-Path ".\.github\CODE_OF_CONDUCT.md") {
-    $coc = Get-Content ".\.github\CODE_OF_CONDUCT.md" -Raw
-    $coc = $coc -replace 'christaylor\.codes', "yourdomain.com"
-    if ($PSCmdlet.ShouldProcess('CODE_OF_CONDUCT.md', 'Replace placeholders')) {
-        Set-Content -Path ".\.github\CODE_OF_CONDUCT.md" -Value $coc -NoNewline
-        Write-Info "CODE_OF_CONDUCT.md updated - review contact emails"
-    }
-}
-
-# Update module manifest
-Write-Step "Customizing Module Source Files"
-$manifestFile = ".\source\ModuleName.psd1"
-if (Test-Path $manifestFile) {
-    $manifest = Get-Content $manifestFile -Raw
+# Module manifest
+Write-Step 'Customizing Module Source Files'
+$psdAuthor = ConvertTo-PsdLiteral $Author
+Update-TemplateFile -Path '.\source\ModuleName.psd1' -Replace (@(
+        , @("/YOUR-USERNAME/ModuleName/", "/$GitHubUsername/$RepositoryName/")
+        , @("/YOUR-USERNAME/ModuleName'", "/$GitHubUsername/$RepositoryName'")
+        , @('YOUR-USERNAME', $GitHubUsername)
+        , @('Your Company', (ConvertTo-PsdLiteral $CompanyName))
+        , @('Brief description of what this module does', (ConvertTo-PsdLiteral $Description))
+    )) -Transform {
+    param($c)
     $guidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
-    $manifest = $manifest -replace $guidPattern, $ModuleGuid
-    $manifest = $manifest -replace 'YOUR-USERNAME', $GitHubUsername
-    $manifest = $manifest -replace 'Your Name', $Author
-    $manifest = $manifest -replace 'Your Company', $CompanyName
-    $manifest = $manifest -replace 'Brief description of what this module does', $Description
-    $manifest = $manifest -replace '\(c\) \d{4} Your Name', "(c) $CurrentYear $Author"
-    $manifest = $manifest -replace 'ModuleName', $ModuleName
-    # Update URIs with repository name (may differ from module name)
-    $manifest = $manifest -replace "/$([regex]::Escape($ModuleName))/blob/main/", "/$RepositoryName/blob/main/"
-    $manifest = $manifest -replace "/$([regex]::Escape($ModuleName))/main/docs/media/", "/$RepositoryName/main/docs/media/"
-    $manifest = $manifest -replace "/$([regex]::Escape($ModuleName))'", "/$RepositoryName'"
-    if ($PSCmdlet.ShouldProcess('Module manifest', 'Replace placeholders and generate GUID')) {
-        Set-Content -Path $manifestFile -Value $manifest -NoNewline
-        Write-Success "Module manifest customized (GUID: $ModuleGuid)"
-    }
+    $c = [regex]::Replace($c, $guidPattern, [System.Text.RegularExpressions.MatchEvaluator] { param($m) $ModuleGuid })
+    # Copyright first, so 'Your Name' is still present for the pattern to match
+    $c = [regex]::Replace($c, '\(c\) \d{4} Your Name',
+        [System.Text.RegularExpressions.MatchEvaluator] { param($m) "(c) $CurrentYear $psdAuthor" })
+    $c = $c.Replace('Your Name', $psdAuthor)
+    [regex]::Replace($c, '(?<![-$:A-Za-z0-9])ModuleName(?![A-Za-z0-9])',
+        [System.Text.RegularExpressions.MatchEvaluator] { param($m) $ModuleName })
+}
+Write-Info "Module GUID: $ModuleGuid"
+
+$codeReplacements = @(
+    , @('/YOUR-USERNAME/ModuleName', "/$GitHubUsername/$RepositoryName")
+    , @('Your Name', $Author)
+) + $commonReplacements
+
+Update-TemplateFile -Path '.\source\Public\Get-ModuleInfo.ps1' -Replace $codeReplacements -ReplaceModuleName
+Update-TemplateFile -Path '.\source\ModuleName.psm1' -Replace $codeReplacements -ReplaceModuleName
+Update-TemplateFile -Path '.\source\en-US\about_ModuleName.help.txt' -Replace $codeReplacements -ReplaceModuleName
+
+# Tests (TestHelper.psm1 discovers the module name itself, so it is not edited)
+Write-Step 'Customizing Tests'
+Update-TemplateFile -Path '.\Tests\Unit\Public\Get-ModuleInfo.Tests.ps1' -ReplaceModuleName
+Update-TemplateFile -Path '.\Tests\Unit\Module\ModuleName.Module.Tests.ps1' -ReplaceModuleName
+
+# Templates used by New-Function.ps1
+Write-Step 'Customizing Templates'
+foreach ($templateFile in Get-ChildItem -Path '.\Templates' -Filter '*.ps1' -File) {
+    Update-TemplateFile -Path $templateFile.FullName -Replace $codeReplacements -ReplaceModuleName
 }
 
-# Update example function
-$exampleFunction = ".\source\Public\Get-ModuleInfo.ps1"
-if (Test-Path $exampleFunction) {
-    $content = Get-Content $exampleFunction -Raw
-    $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
-    $content = $content -replace 'Your Name', $Author
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('Get-ModuleInfo.ps1', 'Replace placeholders')) {
-        Set-Content -Path $exampleFunction -Value $content -NoNewline
-        Write-Success "Example function customized"
-    }
+# Documentation
+Write-Step 'Customizing Documentation Files'
+$docReplacements = @(
+    , @('/YOUR-USERNAME/ModuleName', "/$GitHubUsername/$RepositoryName")
+    , @('Your Name', $Author)
+    , @('Your Company', $CompanyName)
+) + $commonReplacements
+foreach ($docFile in @('.\docs\PUBLISHING.md', '.\docs\USAGE.md', '.\docs\examples\Example-BasicUsage.ps1')) {
+    Update-TemplateFile -Path $docFile -Replace $docReplacements -ReplaceModuleName
 }
 
-# Update root module file
-$rootModule = ".\source\ModuleName.psm1"
-if (Test-Path $rootModule) {
-    $content = Get-Content $rootModule -Raw
-    $content = $content -replace 'Your Name', $Author
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess("$ModuleName.psm1", 'Replace placeholders')) {
-        Set-Content -Path $rootModule -Value $content -NoNewline
-        Write-Success "Root module file customized"
-    }
-}
-
-# Update test files
-$testFile = ".\Tests\Unit\Public\Get-ModuleInfo.Tests.ps1"
-if (Test-Path $testFile) {
-    $content = Get-Content $testFile -Raw
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('Get-ModuleInfo.Tests.ps1', 'Replace placeholders')) {
-        Set-Content -Path $testFile -Value $content -NoNewline
-        Write-Success "Test file customized"
-    }
-}
-
-# Update TestHelper module
-$testHelper = ".\Tests\TestHelpers\TestHelper.psm1"
-if (Test-Path $testHelper) {
-    $content = Get-Content $testHelper -Raw
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('TestHelper.psm1', 'Replace placeholders')) {
-        Set-Content -Path $testHelper -Value $content -NoNewline
-        Write-Success "TestHelper.psm1 customized"
-    }
-}
-
-# Update module health tests
-$moduleTest = ".\Tests\Unit\Module\ModuleName.Module.Tests.ps1"
-if (Test-Path $moduleTest) {
-    $content = Get-Content $moduleTest -Raw
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('Module health tests', 'Replace placeholders and rename')) {
-        Set-Content -Path $moduleTest -Value $content -NoNewline
-        $newModuleTestName = "$ModuleName.Module.Tests.ps1"
-        if ("ModuleName.Module.Tests.ps1" -ne $newModuleTestName) {
-            Rename-Item -Path $moduleTest -NewName $newModuleTestName
-        }
-        Write-Success "Module health tests customized"
-    }
-}
-
-# Update templates
-Write-Step "Customizing Templates"
-$templateFiles = @(
-    ".\Templates\Function.ps1"
-    ".\Templates\PrivateFunction.ps1"
-    ".\Templates\Test.Tests.ps1"
-    ".\Templates\PrivateTest.Tests.ps1"
-    ".\Templates\IntegrationTest.Tests.ps1"
+# Build and CI configuration
+Write-Step 'Customizing Build and CI Configuration'
+Update-TemplateFile -Path '.\build.yaml' -Replace @(
+    , @('GitHubConfigUserName: YOUR-USERNAME', "GitHubConfigUserName: $GitHubUsername")
+    , @('GitHubConfigUserEmail: your@email.com', "GitHubConfigUserEmail: $GitHubEmail")
 )
-foreach ($templateFile in $templateFiles) {
-    if (Test-Path $templateFile) {
-        $content = Get-Content $templateFile -Raw
-        $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
-        $content = $content -replace 'YOUR-REPO', $RepositoryName
-        $content = $content -replace 'Your Name', $Author
-        $content = $content -replace 'yourusername', $GitHubUsername
-        $content = $content -replace 'ModuleName', $ModuleName
-        $leafName = Split-Path -Leaf $templateFile
-        if ($PSCmdlet.ShouldProcess($leafName, 'Replace placeholders')) {
-            Set-Content -Path $templateFile -Value $content -NoNewline
-            Write-Success "$leafName customized"
-        }
-    }
-}
-
-# Update about topic
-$aboutTopic = ".\docs\en-US\about_ModuleName.help.txt"
-if (Test-Path $aboutTopic) {
-    $content = Get-Content $aboutTopic -Raw
-    $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('about_ModuleName.help.txt', 'Replace placeholders and rename')) {
-        Set-Content -Path $aboutTopic -Value $content -NoNewline
-        $newAboutName = "about_$ModuleName.help.txt"
-        if ("about_ModuleName.help.txt" -ne $newAboutName) {
-            Rename-Item -Path $aboutTopic -NewName $newAboutName
-        }
-        Write-Success "About topic customized"
-    }
-}
-
-# Update additional documentation files
-Write-Step "Customizing Documentation Files"
-$additionalDocs = @(
-    ".\docs\PUBLISHING.md"
-    ".\docs\examples\Example-BasicUsage.ps1"
-)
-foreach ($docFile in $additionalDocs) {
-    if (Test-Path $docFile) {
-        $content = Get-Content $docFile -Raw
-        $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
-        $content = $content -replace 'Your Name', $Author
-        $content = $content -replace 'Your Company', $CompanyName
-        $content = $content -replace 'yourusername', $GitHubUsername
-        $content = $content -replace 'ModuleName', $ModuleName
-        $leafName = Split-Path -Leaf $docFile
-        if ($PSCmdlet.ShouldProcess($leafName, 'Replace placeholders')) {
-            Set-Content -Path $docFile -Value $content -NoNewline
-            Write-Success "$leafName customized"
-        }
-    }
-}
-
-# Update New-Function.ps1 helper script
-$newFuncScript = ".\Scripts\New-Function.ps1"
-if (Test-Path $newFuncScript) {
-    $content = Get-Content $newFuncScript -Raw
-    $content = $content -replace 'Your Name', $Author
-    $content = $content -replace 'yourusername', $GitHubUsername
-    if ($PSCmdlet.ShouldProcess('New-Function.ps1', 'Replace placeholders')) {
-        Set-Content -Path $newFuncScript -Value $content -NoNewline
-        Write-Success "New-Function.ps1 customized"
-    }
-}
-
-# Update USAGE.md
-$usageDoc = ".\docs\USAGE.md"
-if (Test-Path $usageDoc) {
-    $content = Get-Content $usageDoc -Raw
-    $content = $content -replace 'YOUR-USERNAME', $GitHubUsername
-    $content = $content -replace 'yourusername', $GitHubUsername
-    $content = $content -replace 'ModuleName', $ModuleName
-    if ($PSCmdlet.ShouldProcess('USAGE.md', 'Replace placeholders')) {
-        Set-Content -Path $usageDoc -Value $content -NoNewline
-        Write-Success "USAGE.md customized"
-    }
+foreach ($workflow in @('.\.github\workflows\ci.yml', '.\.github\workflows\pr-validation.yml')) {
+    Update-TemplateFile -Path $workflow -Replace @(, @('MODULE_NAME: ModuleName', "MODULE_NAME: $ModuleName"))
 }
 
 # Rename module files
-Write-Step "Renaming Module Files"
+Write-Step 'Renaming Module Files'
 $fileRenames = @(
-    @{ Source = ".\source\ModuleName.psd1"; Target = "$ModuleName.psd1" }
-    @{ Source = ".\source\ModuleName.psm1"; Target = "$ModuleName.psm1" }
+    @{ Source = '.\source\ModuleName.psd1'; Target = "$ModuleName.psd1" }
+    @{ Source = '.\source\ModuleName.psm1'; Target = "$ModuleName.psm1" }
+    @{ Source = '.\source\en-US\about_ModuleName.help.txt'; Target = "about_$ModuleName.help.txt" }
+    @{ Source = '.\Tests\Unit\Module\ModuleName.Module.Tests.ps1'; Target = "$ModuleName.Module.Tests.ps1" }
 )
 foreach ($rename in $fileRenames) {
     $sourceName = Split-Path -Leaf $rename.Source
-    if ((Test-Path $rename.Source) -and ($sourceName -ne $rename.Target)) {
+    if ((Test-Path $rename.Source) -and ($sourceName -cne $rename.Target)) {
         if ($PSCmdlet.ShouldProcess($sourceName, "Rename to $($rename.Target)")) {
             Rename-Item -Path $rename.Source -NewName $rename.Target
             Write-Success "Renamed $sourceName -> $($rename.Target)"
@@ -436,107 +344,77 @@ foreach ($rename in $fileRenames) {
     }
 }
 
-# Handle donation files
-if ($SkipDonation) {
-    Write-Step "Removing Donation Content"
-    if ($PSCmdlet.ShouldProcess('Donation files', 'Remove')) {
-        if (Test-Path ".\docs\DONATE.md") {
-            Remove-Item ".\docs\DONATE.md" -Force
-        }
-        foreach ($donationFile in @('.\docs\media\BTC.png', '.\docs\media\BTC.txt',
-                '.\docs\media\ETH.png', '.\docs\media\ETH.txt')) {
-            if (Test-Path $donationFile) {
-                Remove-Item $donationFile -Force
-            }
-        }
-        Write-Success "Donation files removed"
+# Donation content
+# Root DONATE.md and Media/ only exist as backwards-compatible mirrors for links
+# to the template itself; new projects never need them.
+Write-Step 'Handling Donation Content'
+Remove-TemplateItem -Path '.\DONATE.md'
+Remove-TemplateItem -Path '.\Media'
 
-        # Remove donation badge from README
-        $readme = Get-Content ".\README.md" -Raw
-        $donatePattern = '\[\!\[Donate\].*?\]\(.*?DONATE\.md\)\r?\n?'
-        $readme = $readme -replace $donatePattern, ''
-        Set-Content -Path ".\README.md" -Value $readme -NoNewline
-        Write-Success "Donation badge removed from README"
+if ($SkipDonation) {
+    Remove-TemplateItem -Path '.\docs\DONATE.md'
+    foreach ($donationFile in @('BTC.png', 'BTC.txt', 'ETH.png', 'ETH.txt')) {
+        Remove-TemplateItem -Path (Join-Path '.\docs\media' $donationFile)
     }
-} else {
-    Write-Step "Customizing DONATE.md"
-    if (Test-Path ".\docs\DONATE.md") {
-        $donate = Get-Content ".\docs\DONATE.md" -Raw
-        $donate = $donate -replace 'christaylorcodes', $GitHubUsername
-        if ($PSCmdlet.ShouldProcess('DONATE.md', 'Replace placeholders')) {
-            Set-Content -Path ".\docs\DONATE.md" -Value $donate -NoNewline
-            Write-Success "DONATE.md customized"
-        }
-        Write-Caution "Remember to update donation wallet addresses and QR codes in .\docs\media\"
+    # Remove the README "Support" section that links to DONATE.md
+    Update-TemplateFile -Path '.\README.md' -Transform {
+        param($c)
+        $c -replace '(?s)\r?\n## \[Support\]\(docs/DONATE\.md\).*?(?=\r?\n## |\z)', ''
     }
+}
+else {
+    Update-TemplateFile -Path '.\docs\DONATE.md' -Transform {
+        param($c)
+        # Drop the template-only mirror note
+        $c -replace '(?s)\A<!--.*?-->\s*', ''
+    }
+    Write-Caution 'docs/DONATE.md still contains the template author''s PayPal link and wallet addresses.'
+    Write-Caution 'Replace them (and the QR codes in docs/media/) with your own, or re-run with -SkipDonation.'
 }
 
 # Clean up template-specific files
-Write-Step "Cleaning Template Files"
-$filesToRemove = @(
-    ".\Scripts\Test-Template.ps1"
-    ".\Scripts\New-TemplateBadges.ps1"
-    ".\docs\TEMPLATE_USAGE.md"
-    ".\docs\TEMPLATE_DEVELOPMENT.md"
-    $MyInvocation.MyCommand.Definition
-)
-
-foreach ($file in $filesToRemove) {
-    if (Test-Path $file) {
-        if ($PSCmdlet.ShouldProcess($file, 'Remove template file')) {
-            Remove-Item -Path $file -Force
-            Write-Success "Removed $file"
-        }
-    }
+Write-Step 'Cleaning Template Files'
+foreach ($item in @(
+        '.\Scripts\Test-Template.ps1'
+        '.\Scripts\New-TemplateBadges.ps1'
+        '.\Scripts\Initialize-Roadmap.ps1'
+        '.\docs\TEMPLATE_USAGE.md'
+        '.\docs\TEMPLATE_DEVELOPMENT.md'
+        '.\Tests\Template'
+        '.\.claude\plans'
+    )) {
+    Remove-TemplateItem -Path $item
 }
 
 # Rename AI_SETUP_GUIDE.md to CUSTOMIZATION_GUIDE.md (keep as post-init reference)
-$setupGuide = ".\docs\AI_SETUP_GUIDE.md"
+$setupGuide = '.\docs\AI_SETUP_GUIDE.md'
 if (Test-Path $setupGuide) {
     if ($PSCmdlet.ShouldProcess('AI_SETUP_GUIDE.md', 'Rename to CUSTOMIZATION_GUIDE.md')) {
-        Rename-Item -Path $setupGuide -NewName "CUSTOMIZATION_GUIDE.md"
-        Write-Success "AI_SETUP_GUIDE.md renamed to CUSTOMIZATION_GUIDE.md"
+        Rename-Item -Path $setupGuide -NewName 'CUSTOMIZATION_GUIDE.md'
+        Write-Success 'AI_SETUP_GUIDE.md renamed to CUSTOMIZATION_GUIDE.md'
     }
 }
 
-# Set up .claude/ directory for AI agent sessions
-if (-not (Test-Path ".\.claude")) {
-    New-Item -ItemType Directory -Path ".\.claude" | Out-Null
-}
-# Remove template-specific .claude/ content
-if (Test-Path ".\.claude\plans") {
-    if ($PSCmdlet.ShouldProcess('.claude/plans/', 'Remove template plans')) {
-        Remove-Item ".\.claude\plans" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Success "Template plans removed"
-    }
-}
-foreach ($cmd in @('plan.md', 'interview.md', 'brainstorm.md')) {
-    $cmdPath = ".\.claude\commands\$cmd"
-    if (Test-Path $cmdPath) {
-        if ($PSCmdlet.ShouldProcess($cmdPath, 'Remove template command')) {
-            Remove-Item $cmdPath -Force
-        }
-    }
-}
+# Remove this script last
+Remove-TemplateItem -Path $MyInvocation.MyCommand.Definition
 
 # Initialize Git repository
 if ($InitializeGit) {
-    Write-Step "Initializing Git Repository"
+    Write-Step 'Initializing Git Repository'
 
-    # Check if .git already exists
-    if (Test-Path ".\.git") {
-        Write-Warning "Git repository already exists. Skipping git initialization."
-        Write-Info "If you want to start fresh, delete the .git directory manually first."
-    } elseif ($PSCmdlet.ShouldProcess('Repository', 'Initialize git and create initial commit')) {
-        # Initialize new repo
+    if (Test-Path '.\.git') {
+        Write-Warning 'Git repository already exists. Skipping git initialization.'
+        Write-Info 'If you want to start fresh, delete the .git directory manually first.'
+    }
+    elseif ($PSCmdlet.ShouldProcess('Repository', 'Initialize git and create initial commit')) {
         git init
-        Write-Success "Git repository initialized"
+        if ($LASTEXITCODE -ne 0) { throw 'git init failed' }
+        Write-Success 'Git repository initialized'
 
-        # Add all files
         git add .
-        Write-Success "Files staged for commit"
+        if ($LASTEXITCODE -ne 0) { throw 'git add failed' }
+        Write-Success 'Files staged for commit'
 
-        # Create initial commit
         $commitMessage = @"
 Initial commit - $Name
 
@@ -546,60 +424,52 @@ Description: $Description
 Author: $Author
 
 Generated from GitHub-Template
-https://github.com/christaylorcodes/GitHub-Template
+https://github.com/$TemplateSlug
 "@
         git commit -m $commitMessage
-        Write-Success "Initial commit created"
+        if ($LASTEXITCODE -ne 0) { throw 'git commit failed (is user.name/user.email configured?)' }
+        Write-Success 'Initial commit created'
 
-        Write-Info "To push to GitHub, create a repository and run:"
-        $remoteUrl = "https://github.com/$GitHubUsername/$RepositoryName.git"
-        Write-Host "  git remote add origin $remoteUrl" -ForegroundColor White
-        Write-Host "  git branch -M main" -ForegroundColor White
-        Write-Host "  git push -u origin main" -ForegroundColor White
+        Write-Info 'To push to GitHub, create a repository and run:'
+        Write-Host "  git remote add origin https://github.com/$RepoSlug.git" -ForegroundColor White
+        Write-Host '  git branch -M main' -ForegroundColor White
+        Write-Host '  git push -u origin main' -ForegroundColor White
     }
 }
 
 # Summary
-Write-Step "Initialization Complete!"
-Write-Host ""
-Write-Success "Repository customized successfully!"
-Write-Host ""
-Write-Host "Project Details:" -ForegroundColor Yellow
+Write-Step 'Initialization Complete!'
+Write-Host ''
+Write-Success 'Repository customized successfully!'
+Write-Host ''
+Write-Host 'Project Details:' -ForegroundColor Yellow
 Write-Host "  Name:        $Name"
 Write-Host "  Module:      $ModuleName"
 Write-Host "  Description: $Description"
 Write-Host "  Author:      $Author"
 Write-Host "  Company:     $CompanyName"
 Write-Host "  GUID:        $ModuleGuid"
-Write-Host "  GitHub:      https://github.com/$GitHubUsername/$RepositoryName"
-Write-Host ""
-Write-Host "Next Steps:" -ForegroundColor Yellow
-$stepNum = 1
-Write-Host "  $stepNum. Verify module loads: Import-Module ./source/$ModuleName.psd1 -Force"
-$stepNum++
-Write-Host "  $stepNum. Run build: ./build.ps1 -ResolveDependency -Tasks build"
-$stepNum++
-Write-Host "  $stepNum. Run tests: ./Tests/test-local.ps1"
-$stepNum++
-Write-Host "  $stepNum. Review and update .\README.md"
-$stepNum++
-Write-Host "  $stepNum. Replace .\docs\media\Logo.png with your project logo"
-$stepNum++
-Write-Host "  $stepNum. Replace .\docs\media\Demo.gif with your project demo"
-$stepNum++
-Write-Host "  $stepNum. Update badge URLs in README.md"
-$stepNum++
+Write-Host "  GitHub:      https://github.com/$RepoSlug"
+Write-Host ''
+Write-Host 'Next Steps:' -ForegroundColor Yellow
+$steps = @(
+    "Verify module loads: Import-Module ./source/$ModuleName.psd1 -Force"
+    'Run build: ./build.ps1 -ResolveDependency -Tasks build'
+    'Run tests: ./Tests/test-local.ps1'
+    'Review and update ./README.md (badges, description, Logo.png, Demo.gif)'
+    'Create the "production" and "prerelease" environments and their PSGALLERY_API_KEY secrets (docs/PUBLISHING.md)'
+)
 if (-not $SkipDonation) {
-    Write-Host "  $stepNum. Update donation wallet addresses in .\docs\media\"
-    $stepNum++
+    $steps += 'Update donation links and wallet addresses in ./docs/DONATE.md and ./docs/media/'
 }
-Write-Host "  $stepNum. Update contact emails in .github/SECURITY.md and .github/CODE_OF_CONDUCT.md"
-$stepNum++
-Write-Host "  $stepNum. Review AGENTS.md and CLAUDE.md for your project"
-$stepNum++
-Write-Host "  $stepNum. Run .\Scripts\Initialize-Labels.ps1 to create AI workflow labels (optional)"
-Write-Host ""
+$steps += 'Update contact emails in .github/SECURITY.md and .github/CODE_OF_CONDUCT.md'
+$steps += 'Review AGENTS.md and CLAUDE.md for your project'
+$steps += 'Run ./Scripts/Initialize-Labels.ps1 to create AI workflow labels (optional)'
+for ($i = 0; $i -lt $steps.Count; $i++) {
+    Write-Host "  $($i + 1). $($steps[$i])"
+}
+Write-Host ''
 Write-Info "Use 'git checkout -- .' to undo changes (if repo was cloned)"
-Write-Info "Run /customize in Claude Code for guided project setup"
-Write-Host ""
-Write-Success "Happy coding!"
+Write-Info 'Run /customize in Claude Code for guided project setup'
+Write-Host ''
+Write-Success 'Happy coding!'
