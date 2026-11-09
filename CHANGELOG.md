@@ -61,7 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.psm1` body (use prefix/suffix files for init code)
 - `.vscode/settings.json` formatter matches the analyzer brace rules; `output` exclusion casing fixed
 - `.gitignore` secret patterns narrowed (`*secret*` ignored files like `Get-Secret.ps1`); `tags` root-only
-- `build.ps1` and `Resolve-Dependency.ps1` marked `linguist-vendored` (PSResourceGet); the unused `publish` build workflow was removed
+- `build.ps1` and `Resolve-Dependency.ps1` marked `linguist-vendored`
+- **Docs generation moved to Microsoft.PowerShell.PlatyPS 1.x** (`[1.0.3,2.0.0)`), replacing
+  Sampler's PlatyPS tasks and the legacy platyPS 0.14.2 (unmaintained since 2021). New task
+  `Generate_Markdown_Help` (`.build/docs.ps1`) runs `Scripts/Update-MarkdownHelp.ps1` in a separate
+  process, regenerates `docs/help/<module>/` from comment-based help, validates every file with
+  `Test-MarkdownCommandHelp` and lists remaining placeholders. No MAML is generated: `Get-Help` already
+  works from comment-based help in the built module. `Scripts/Update-PlatyPSDocs.ps1` removed (PSResourceGet); the unused `publish` build workflow was removed
 
 ## [1.1.0] - 2026-02-01
 

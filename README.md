@@ -48,7 +48,7 @@ This template gives you everything needed to publish a professional PowerShell m
 | **Code Quality** | PSScriptAnalyzer with tuned rule set and editor integration | [.PSScriptAnalyzerSettings.psd1](.PSScriptAnalyzerSettings.psd1) |
 | **CI/CD Workflows** | GitHub Actions for testing, analysis, and PSGallery publishing | [AGENTS.md — CI/CD](AGENTS.md#cicd) |
 | **Module Structure** | Auto-discovering `source/` layout with Classes, Private, and Public folders | [AGENTS.md — Architecture](AGENTS.md#architecture) |
-| **Documentation** | Comment-based help, platyPS markdown docs, usage guides | [docs/](docs/) |
+| **Documentation** | Comment-based help, generated markdown command reference (PlatyPS 1.x), usage guides | [docs/](docs/) |
 | **Templates** | Boilerplate for new functions, classes, and Pester tests | [Templates/](Templates/) |
 | **Automation Scripts** | Repository initialization, validation, badge generation, label setup | [Scripts/](Scripts/) |
 | **Community Files** | Contributing guide, code of conduct, security policy, issue/PR templates | [CONTRIBUTING.md](.github/CONTRIBUTING.md) |

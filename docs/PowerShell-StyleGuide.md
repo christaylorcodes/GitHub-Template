@@ -189,13 +189,13 @@ Private functions: `.SYNOPSIS`, `.PARAMETER`, and one `.EXAMPLE` are sufficient.
 
 ### Documentation Generation (PlatyPS)
 
-Comment-based help is the **source of truth** for all documentation. The build system uses PlatyPS to generate markdown and MAML XML from it:
+Comment-based help is the **source of truth** for all documentation. `Get-Help` reads it directly from the built module, so no MAML/XML help is generated. For reference docs (GitHub, a docs site), the build generates markdown from it with Microsoft.PowerShell.PlatyPS 1.x:
 
 ```powershell
-./build.ps1 -Tasks docs  # Regenerate markdown help in docs/help/en-US/ from comment-based help
+./build.ps1 -Tasks docs  # Build, then regenerate docs/help/<ModuleName>/*.md from comment-based help
 ```
 
-**Flow:** `.ps1` comment-based help → `Get-Help` → PlatyPS → Markdown (`docs/help/en-US/`) → MAML XML (built module's `en-US/` under `output/`). Do not manually edit the generated markdown or XML files — update the comment-based help in the source `.ps1` files and regenerate.
+**Flow:** `.ps1` comment-based help → built module → PlatyPS (`Scripts/Update-MarkdownHelp.ps1`) → `docs/help/<ModuleName>/`. The folder is regenerated from scratch on every run and each file is validated with `Test-MarkdownCommandHelp`. Do not hand-edit the generated markdown: update the comment-based help and regenerate. The task lists any remaining `{{ ... }}` placeholders, which point at gaps in your comment-based help.
 
 ### Known Parser Pitfall: Dot at Start of Line
 
